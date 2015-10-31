@@ -7,8 +7,8 @@ RPG-Maker-MV
  * Header from Plugins are not to be removed.
  * Plugins can be edited/modified but can not be claimed as your own.
  * Credit is not required, but would be appreciated.
- * Do not ask for compatibility patches.
- * Any addition terms in Plugin must be followed.
+ * Compatibility patches may be denied.
+ * Any additional terms in Plugin must be followed.
 
 <b>ADDITIONAL TERMS FOR COMMERCIAL:</b>
  * Please contact Quasi for payment information ( Name your price ).
