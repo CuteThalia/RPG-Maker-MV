@@ -14,11 +14,11 @@
 //  - Configure as needed
 //  - Open the Help menu for setup guide or visit one of the following:
 //  - - http://quasixi.com/mv/movement/
-//  - - http://forums.rpgmakerweb.com/ (post link)
+//  - - http://forums.rpgmakerweb.com/index.php?/topic/48741-quasi-movement/
 //============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_Movement = 0.9;
+Imported.Quasi_Movement = 1.0;
 
 //=============================================================================
  /*:
@@ -188,7 +188,7 @@ Imported.Quasi_Movement = 0.9;
  * =Special thanks to Archeia===================================================
  * Links
  *  - http://quasixi.com/mv/movement/
- *  - http://forums.rpgmakerweb.com/ (post link)
+ *  - http://forums.rpgmakerweb.com/index.php?/topic/48741-quasi-movement/
  */
 //=============================================================================
 
