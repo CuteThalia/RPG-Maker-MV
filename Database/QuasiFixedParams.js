@@ -12,7 +12,7 @@
 //  - Add plugin through the plugin manager
 //  - Open the Help menu for setup guide or visit one of the following:
 //  - - http://quasixi.com/mv/
-//  - - http://forums.rpgmakerweb.com/ (post link)
+//  - - http://forums.rpgmakerweb.com/index.php?/topic/48777-quasi-fixed-params/
 //=============================================================================
 var Imported = Imported || {};
 Imported.Quasi_FixedParams = 1.01;
@@ -60,7 +60,7 @@ Imported.Quasi_FixedParams = 1.01;
  * =============================================================================
  *  * Links
  *  - http://quasixi.com/mv/
- *  - http://forums.rpgmakerweb.com/ (post link)
+ *  - http://forums.rpgmakerweb.com/index.php?/topic/48777-quasi-fixed-params/
  */
 //=============================================================================
 (function() {
