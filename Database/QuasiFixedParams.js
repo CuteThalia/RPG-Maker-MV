@@ -11,7 +11,7 @@
 //  - Save this file as "QuasiFixedParams.js" in your js/plugins/ folder
 //  - Add plugin through the plugin manager
 //  - Open the Help menu for setup guide or visit one of the following:
-//  - - http://quasixi.com/mv/fixed-params/
+//  - - http://quasixi.com/mv/
 //  - - http://forums.rpgmakerweb.com/ (post link)
 //=============================================================================
 var Imported = Imported || {};
@@ -59,7 +59,7 @@ Imported.Quasi_FixedParams = 1.01;
  *  * param is not case sensative
  * =============================================================================
  *  * Links
- *  - http://quasixi.com/mv/fixed-params/
+ *  - http://quasixi.com/mv/
  *  - http://forums.rpgmakerweb.com/ (post link)
  */
 //=============================================================================
