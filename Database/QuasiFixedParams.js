@@ -1,7 +1,7 @@
 //=============================================================================
 // Quasi Fixed Params
 // Version: 1.0
-// Last Update: October 31, 2015
+// Last Update: November 1, 2015
 //=============================================================================
 // ** Terms of Use
 // http://quasixi.com/mv/
@@ -15,10 +15,10 @@
 //  - - http://forums.rpgmakerweb.com/ (post link)
 //=============================================================================
 var Imported = Imported || {};
-Imported.Quasi_FixedParams = 1.0;
+Imported.Quasi_FixedParams = 1.01;
 //=============================================================================
  /*:
- * @plugindesc Allows states to increase parameters by a fixed value.
+ * @plugindesc Change the way movement works.
  * @author Quasi      Site: http://quasixi.com
  *
  * @help
@@ -70,6 +70,18 @@ Imported.Quasi_FixedParams = 1.0;
     "mat": 4, "mdf": 5, "agi": 6, "luk": 7,
     "hrt": 8, "mrt": 9, "trt": 10
   }
+  Params.states = {};
+  Params.stateParamsPlus = function(stateId) {
+    if (!this.states[stateId]) {
+      var params = /<params>([\s\S]*)<\/params>/i.exec($dataStates[stateId].note);
+      if (params) {
+        this.states[stateId] = stringToObjAry(params[0]);
+      } else {
+        this.states[stateId] = false;
+      }
+    }
+    return this.states[stateId];
+  };
 
   function stringToObjAry(string) {
     var ary = string.split('\n');
@@ -112,15 +124,11 @@ Imported.Quasi_FixedParams = 1.0;
     var value = 0;
     var states = this.states();
     for (var i = 0; i < states.length; i++) {
-      var params = /<params>([\s\S]*)<\/params>/i.exec(states[i].note);
-      if (params) {
-        param = stringToObjAry(params[0]);
-        if (param[paramId]) {
-          var v = $gameVariables._data;
-          var a = this;
-          value += eval(param[paramId]);
-          console.log(param[paramId], value);
-        }
+      var params = Params.stateParamsPlus(states[i].id);
+      if (params[paramId]) {
+        var v = $gameVariables._data;
+        var a = this;
+        value += eval(params[paramId]);
       }
     }
     return value;
