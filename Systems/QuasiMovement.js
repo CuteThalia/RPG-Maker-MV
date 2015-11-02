@@ -1,7 +1,7 @@
 //============================================================================
 // Quasi Movement
-// Version: 1.0
-// Last Update: October 31, 2015
+// Version: 1.01
+// Last Update: November 1, 2015
 //============================================================================
 // ** Terms of Use
 // http://quasixi.com/mv/
@@ -18,12 +18,12 @@
 //============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_Movement = 1.0;
+Imported.Quasi_Movement = 1.01;
 
 //=============================================================================
  /*:
  * @plugindesc Change the way movement works.
- * @author Quasi      Site: http://quasixi.com
+ * @author Quasi       Site: http://quasixi.com
  *
  * @param Grid
  * @desc The amount of pixels you want to move per movement.
@@ -34,6 +34,11 @@ Imported.Quasi_Movement = 1.0;
  * @desc Allow characters to move faster then the set GRID?
  * Set to true or false
  * @default true
+ *
+ * @param Tile Size
+ * @desc Adjust the size of tile boxes.
+ * Script Default: 48
+ * @default 48
  *
  * @param Smart Move
  * @desc If the move didn't succeed try again at lower speeds.
@@ -69,6 +74,11 @@ Imported.Quasi_Movement = 1.0;
  * @desc Color for deep water collisions (Only Ships can move on).
  * default: #0000ff
  * @default #0000ff
+ *
+ * @param Use Regions Boxes
+ * @desc Set to true if you want to put bounding boxes on regions.
+ * default: false
+ * @default false
  *
  * @param Player Box
  * @desc Default player box. (width, height, ox, oy)
@@ -131,6 +141,36 @@ Imported.Quasi_Movement = 1.0;
  *     Set X or Y to the values you want. Can be negative.
  *     * Resets on page change
  * =============================================================================
+ * ** Setting up Region Boxes
+ * =============================================================================
+ * To use region boxes, you first have to enabled "Use Region Boxes" in
+ * the plugin settings. Next you need to create a json file inside the
+ * data folder called "RegionBoxes.json"
+ *   If you do not know how to create a .json file download my sample
+ *   RegionBoxes.json file:
+ *       https://gist.github.com/quasixi/ff149320fd6885191d87
+ *
+ *   JSON template <JSON>
+ *       {
+ *         "REGION ID 1": [
+ *                     {"width": w, "height": h, "ox": ox value, "oy": oy value}
+ *                        ],
+ *         "REGION ID 2": [
+ *                     {"width": w, "height": h, "ox": value, "oy": value},
+ *                     {"width": w, "height": h, "ox": value, "oy": value}
+ *                        ]
+ *       }
+ *     "REGION ID 2" is an example of a region with 2 boxes
+ *     Replace REGION ID with the actual number for the region, but keep it
+ *     inside the quotes! Becareful with the commas ( , ) place them
+ *     after } or ] only if it's not the last one in the list!
+ *
+ *     You can see line 156 doesn't end with a called because it's the last
+ *     box in that region. line 159 does end with a comma because there's
+ *     another box! But line 160 does not have a comma since it's the last
+ *     box. Line 157 ends with a comma because there's another region.
+ *     But line 161 does not have a comma because it's the last region.
+ * =============================================================================
  * ** Setting up Collision Maps
  * =============================================================================
  * Allows the use of an image with collisions. Using this you can setup a
@@ -140,6 +180,12 @@ Imported.Quasi_Movement = 1.0;
  *     Replace filename with the name of the collision map you want to load.
  *     Don't add the extension, and file should be location in img/parallaxs/
  *     * Map note tags are found in the map properties
+ *
+ *   Add a Region Map <Note Tag>
+ *       <rm=filename>
+ *     Replace filename with the name of the region map you want to load.
+ *     Don't add the extension, and file should be location in img/parallaxs/
+ *     * Region maps do not effect collisions at all!
  * =============================================================================
  * ** Passability Levels
  * =============================================================================
@@ -185,38 +231,49 @@ Imported.Quasi_Movement = 1.0;
  *       mmove(direction, amount, multiplicity)
  *     same definitions as qmove()
  *
+ * Other script calls:
+ *   Get color from region map.
+ *       $gameMap.getPixelRegion(x, y)
+ *     x and y default to players center location.
+ *     return value is a string of the hex color.
+ *
+ *   Get tile flags
+ *       $gameMap.flagsAt(x, y)
+ *     x and y default to players x and y
+ *     works best when grid is equal to tile size.
+ *     the results are logged in the console.
+ *
  * =Special thanks to Archeia===================================================
  * Links
  *  - http://quasixi.com/mv/movement/
+ *  - https://github.com/quasixi/RPG-Maker-MV
  *  - http://forums.rpgmakerweb.com/index.php?/topic/48741-quasi-movement/
  */
 //=============================================================================
 
 (function() {
   var Movement = {};
-  proccessParameters();
-
-  function proccessParameters() {
-    var parameters      = PluginManager.parameters('QuasiMovement');
-    Movement.grid       = Number(parameters['Grid'] || 1);
-    Movement.offGrid    = (parameters['Off Grid'].toLowerCase() === 'true');
-    // tileSize change not working
-    Movement.tileSize   = 48;//Number(parameters['Tile Size'] || 48);
-    Movement.smartMove  = Number(parameters['Smart Move'] || 0);
-    Movement.midPass    = (parameters['Mid Pass'].toLowerCase() === 'true');
-    Movement.diagonal   = (parameters['Diagonal'].toLowerCase() === 'true');
-    Movement.diagSpeed  = Number(parameters['Diagonal Speed'] || 0);
-    Movement.collision  = parameters['Collision'];
-    Movement.water1     = parameters['Water Collision'];
-    Movement.water2     = parameters['Deep Water Collision'];
-    Movement.playerBox  = stringToIntAry(parameters['Player Box']);
-    Movement.eventBox   = stringToIntAry(parameters['Event Box']);
-    Movement.boatBox    = stringToIntAry(parameters['Boat Box']);
-    Movement.shipBox    = stringToIntAry(parameters['Ship Box']);
-    Movement.airshipBox = stringToIntAry(parameters['Airship Box']);
-    Movement.convert    = (parameters['Convert Collision Map'].toLowerCase() === 'true');
-    Movement.showBoxes  = (parameters['Show Boxes'].toLowerCase() === 'true');
-    Movement.tileBoxes  = {
+  Movement.proccessParameters = function() {
+    var parameters  = PluginManager.parameters('QuasiMovement');
+    this.grid       = Number(parameters['Grid'] || 1);
+    this.offGrid    = (parameters['Off Grid'].toLowerCase() === 'true');
+    this.tileSize   = Number(parameters['Tile Size'] || 48);
+    this.smartMove  = Number(parameters['Smart Move'] || 0);
+    this.midPass    = (parameters['Mid Pass'].toLowerCase() === 'true');
+    this.diagonal   = (parameters['Diagonal'].toLowerCase() === 'true');
+    this.diagSpeed  = Number(parameters['Diagonal Speed'] || 0);
+    this.collision  = parameters['Collision'];
+    this.water1     = parameters['Water Collision'];
+    this.water2     = parameters['Deep Water Collision'];
+    this.playerBox  = stringToIntAry(parameters['Player Box']);
+    this.eventBox   = stringToIntAry(parameters['Event Box']);
+    this.boatBox    = stringToIntAry(parameters['Boat Box']);
+    this.shipBox    = stringToIntAry(parameters['Ship Box']);
+    this.airshipBox = stringToIntAry(parameters['Airship Box']);
+    this.useRegions = (parameters['Use Regions Boxes'].toLowerCase() === 'true');
+    this.convert    = (parameters['Convert Collision Map'].toLowerCase() === 'true');
+    this.showBoxes  = (parameters['Show Boxes'].toLowerCase() === 'true');
+    this.tileBoxes  = {
       1537: [48, 6, 0, 42],
       1538: [6, 48],
       1539: [[48, 6, 0, 42], [6, 48]],
@@ -238,21 +295,40 @@ Imported.Quasi_Movement = 1.0;
       3599: [48, 48],
       3727: [48, 48]
     };
-    var size = Movement.tileSize / 48;
-    for (var key in Movement.tileBoxes) {
-      if (Movement.tileBoxes.hasOwnProperty(key)) {
-        for (var i = 0; i < Movement.tileBoxes[key].length; i++) {
-          if (Movement.tileBoxes[key][i].constructor === Array) {
-            for (var j = 0; j < Movement.tileBoxes[key][i].length; j++) {
-              Movement.tileBoxes[key][i][j] * size;
+    this.regionBoxes = {};
+    this.loadRegionBoxes();
+
+    var size = this.tileSize / 48;
+    for (var key in this.tileBoxes) {
+      if (this.tileBoxes.hasOwnProperty(key)) {
+        for (var i = 0; i < this.tileBoxes[key].length; i++) {
+          if (this.tileBoxes[key][i].constructor === Array) {
+            for (var j = 0; j < this.tileBoxes[key][i].length; j++) {
+              this.tileBoxes[key][i][j] *= size;
             }
           } else {
-            Movement.tileBoxes[key][i] * size;
+            this.tileBoxes[key][i] *= size;
           }
         }
       }
     }
   };
+
+  Movement.loadRegionBoxes = function() {
+    var xhr = new XMLHttpRequest();
+    var url = 'data/RegionBoxes.json';
+    xhr.open('GET', url, true);
+    xhr.overrideMimeType('application/json');
+    xhr.onload = function() {
+      Movement.regionBoxes = JSON.parse(xhr.responseText);
+    };
+    xhr.onerror = function() {
+      alert("File: data/RegionBoxes.json not found.");
+    };
+    xhr.send();
+  };
+
+  Movement.proccessParameters();
 
   function stringToIntAry(string) {
     var ary = string.split(',');
@@ -353,11 +429,11 @@ Imported.Quasi_Movement = 1.0;
     var x2max = otherVertices[1].x;
     var y2min = otherVertices[0].y;
     var y2max = otherVertices[2].y;
-
     var insideX = (x1min <= x2max) && (x1max >= x2min);
     var insideY = (y1min <= y2max) && (y1max >= y2min);
     return insideX && insideY;
   };
+
   Bounding_Box.prototype.inside = function(other) {
     var otherVertices = other._vertices;
     var x2min = otherVertices[0].x;
@@ -380,7 +456,6 @@ Imported.Quasi_Movement = 1.0;
     var x1max = this._vertices[1].x;
     var y1min = this._vertices[0].y;
     var y1max = this._vertices[2].y;
-
     var insideX = (x1min <= x) && (x1max >= x);
     var insideY = (y1min <= y) && (y1max >= y);
     return insideX && insideY;
@@ -446,6 +521,7 @@ Imported.Quasi_Movement = 1.0;
       }
       this.setupTileBoxes();
       this.setupCollisionmap();
+      this.setupRegionmap();
   };
 
   Game_Map.prototype.flagAt = function(x, y) {
@@ -496,8 +572,21 @@ Imported.Quasi_Movement = 1.0;
   };
 
   Game_Map.prototype.tileBox = function(x, y, flag) {
-    var boxData = Movement.tileBoxes[flag];
-    var isSpecial;
+    if (Movement.regionBoxes[this.regionId(x,y)]) {
+      var regionData = Movement.regionBoxes[this.regionId(x,y)];
+      var boxData = [];
+      for (var i = 0; i < regionData.length; i++) {
+        var data = [];
+        data[0] = regionData[i]["width"] || 0;
+        data[1] = regionData[i]["height"] || 0;
+        data[2] = regionData[i]["ox"] || 0;
+        data[3] = regionData[i]["oy"] || 0;
+        boxData[i] = data;
+      }
+      flag = 0;
+    } else {
+      var boxData = Movement.tileBoxes[flag];
+    }
     if (!boxData) {
       if (flag & 0x20 || flag & 0x40 || flag & 0x80 || flag & 0x100) {
         boxData = [Movement.tileSize, Movement.tileSize, 0, 0];
@@ -572,73 +661,81 @@ Imported.Quasi_Movement = 1.0;
     var img = ImageManager.loadParallax(cm[1]);
     var collisionBoxes = img.addLoadListener(function() {
       var boxes = [];
-      var nodes = new Map();
+      var nodes = new Array(img.height);
+      for (var x = 0; x < nodes.length; x++) {
+        nodes[x] = [];
+      }
       var collisions = [];
       collisions.push(Movement.collision);
       collisions.push(Movement.water1);
       collisions.push(Movement.water2);
-
-      for (var y = 0; y < img.height; y++){
-        var x = 0;
-        while (x < img.width - 1){
+      var y = img.height;
+      var x = 0;
+      while (y > 0){
+        y--;
+        x = img.width;
+        while (x > 0){
+          x--;
           while (!collisions.contains(img.getColor(x, y))) {
-            x++;
-            if (x === img.width) break;
+            x--;
+            if (x === 0) {
+              break;
+            }
+          }
+          if (x === 0) {
+            break;
           }
           var color = img.getColor(x, y);
           if (!collisions.contains(color)) {
             break;
           }
-
-          while (nodes.get(x + ", " + y) === true) {
-            x++;
+          while (nodes[y].contains(x)) {
+            x--;
           }
-          if (nodes.get(x + ", " + y) === true) {
-            x++;
-          } else if (img.getColor(x, y) !== color) {
+          if (img.getColor(x, y) !== color) {
             continue;
-          } else if (x >= img.width) {
+          } else if (x < 0) {
             break;
           }
           var starting_x = x;
 
           while (img.getColor(x, y) === color) {
-            x++;
-            if (nodes.get(x + ", " + y) === true) break;
-            if (x == img.width - 1) break;
+            x--;
+            if (nodes[y].contains(x)) {
+              break;
+            }
+            if (x === 0) {
+              break;
+            }
           }
           var ending_x = x;
-          var temp_x = starting_x;
-          var temp_y  = y;
+          var temp_x;
+          var temp_y = y;
 
           while (true) {
             temp_x = starting_x;
-            temp_y++;
-
+            temp_y--;
             while (img.getColor(temp_x, temp_y) === color) {
-              temp_x++;
-              if (temp_x == ending_x) break;
+              temp_x--;
+              if (temp_x === ending_x) {
+                break;
+              }
             }
-
             if (temp_x === ending_x) {
-              for (var scanned_x = starting_x; scanned_x !== ending_x + 1; scanned_x++) {
-                nodes.set(scanned_x + ", " + temp_y, true);
+              for (var scanned_x = starting_x; scanned_x !== ending_x; scanned_x--) {
+                nodes[temp_y].push(scanned_x);
               }
             } else {
               break;
             }
-            if (temp_y === img.height - 1) {
+            if (temp_y === 0) {
               break;
             }
           }
-
-          var w = ending_x - starting_x + 1;
-          if (ending_x === img.width - 1) {
-            w++;
-          }
-          var h = temp_y - y;
+          var w = starting_x - ending_x + 1;
+          var h = y - temp_y + 1;
           var newBox = new Bounding_Box(w, h);
-          newBox.moveto(starting_x, y);
+          newBox.moveto(ending_x, temp_y);
           newBox.color = color;
           boxes.push(newBox);
         }
@@ -657,6 +754,15 @@ Imported.Quasi_Movement = 1.0;
       }
       $gameMap.createCollisionGrid(boxes);
     });
+  };
+
+  Game_Map.prototype.setupRegionmap = function() {
+    var rm = /<rm=(.*)>/i.exec($dataMap.note);
+    if (rm) {
+      this._regionmap = ImageManager.loadParallax(rm[1]);
+    } else {
+      this._regionmap = null;
+    }
   };
 
   Game_Map.prototype.drawTileBoxes = function() {
@@ -805,6 +911,13 @@ Imported.Quasi_Movement = 1.0;
         this._characterGrid[x][y].push(chara);
       }
     }
+  };
+
+  Game_Map.prototype.getPixelRegion = function(x, y) {
+    if (this._regionmap) {
+      return this._regionmap.getColor(x || $gamePlayer.cx(), y || $gamePlayer.cy());
+    }
+    return 0;
   };
 
   Game_Map.prototype.roundPX = function(x) {
@@ -1756,7 +1869,6 @@ Imported.Quasi_Movement = 1.0;
       if (wasMoving) {
         if (this._freqCount >= this.freqThreshold()) {
           $gameParty.onPlayerWalk();
-          this._freqCount = 0;
         }
         this.checkEventTriggerHere([1,2]);
         if ($gameMap.setupStartingEvent()) {
@@ -1767,7 +1879,10 @@ Imported.Quasi_Movement = 1.0;
         return;
       }
       if (wasMoving) {
-        this.updateEncounterCount();
+        if (this._freqCount >= this.freqThreshold()) {
+          this.updateEncounterCount();
+          this._freqCount = 0;
+        }
       } else {
         $gameTemp.clearDestination();
       }
@@ -2125,7 +2240,7 @@ Imported.Quasi_Movement = 1.0;
     } else {
       return Game_Character.prototype.boundingBox.call(this, direction);
     }
-  }
+  };
 
   //-----------------------------------------------------------------------------
   // Game_Follower
@@ -2333,9 +2448,9 @@ Imported.Quasi_Movement = 1.0;
     return comments.join('\n');
   };
 
-  var Alias_Game_Event_setupPage = Game_Event.prototype.setupPage;
-  Game_Event.prototype.setupPage = function() {
-    Alias_Game_Event_setupPage.call(this);
+  var Alias_Game_Event_setupPageSettings = Game_Event.prototype.setupPageSettings;
+  Game_Event.prototype.setupPageSettings = function() {
+    Alias_Game_Event_setupPageSettings.call(this);
     this.initalPosition();
     this.passabilityLevel(true);
     this._boundingBox = null;
@@ -2481,6 +2596,13 @@ Imported.Quasi_Movement = 1.0;
     this._collisionmap.opacity = 100;
     this._collisionmap.move(0, 0, Graphics.width, Graphics.height);
     this.addChild(this._collisionmap);
+    if ($gameMap._regionmap) {
+      this._regionmap = new TilingSprite();
+      this._regionmap.bitmap = $gameMap._regionmap;
+      this._regionmap.opacity = 100;
+      this._regionmap.move(0, 0, Graphics.width, Graphics.height);
+      this._collisionmap.addChild(this._regionmap);
+    }
     if (!Movement.showBoxes) {
       this._collisionmap.visible = false;
     }
@@ -2494,6 +2616,13 @@ Imported.Quasi_Movement = 1.0;
     }
     if (this._collisionmap.bitmap !== $gameMap._collisionmap) {
       this._collisionmap.bitmap = $gameMap._collisionmap;
+    }
+    if (this._regionmap) {
+      if (this._regionmap.bitmap !== $gameMap._regionmap) {
+        this._regionmap.bitmap = $gameMap._regionmap;
+      }
+      this._regionmap.origin.x = $gameMap.displayX() * $gameMap.tileWidth();
+      this._regionmap.origin.y = $gameMap.displayY() * $gameMap.tileHeight();
     }
     this._collisionmap.origin.x = $gameMap.displayX() * $gameMap.tileWidth();
     this._collisionmap.origin.y = $gameMap.displayY() * $gameMap.tileHeight();
