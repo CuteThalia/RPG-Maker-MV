@@ -50,17 +50,17 @@ Imported.Quasi_FixedParams = 1.02;
  * ** Examples:
  * =============================================================================
  *   Example 1:
- *       <param>
+ *       <params>
  *       MHP: 100
  *       ATK: 20
- *       </param>
+ *       </params>
  *     Would result in that state adding 100 to max hp and 20 to attack.
  *
  *   Example 2:
- *       <param>
+ *       <params>
  *       MHP: -100
  *       MRT: 5 + v[1]
- *       </param>
+ *       </params>
  *     Would result in that state removes 100 hp but you will have an mp regen
  *     of 5 + value of variable 1
  *
