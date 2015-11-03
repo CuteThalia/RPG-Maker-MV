@@ -27,7 +27,7 @@ Imported.Quasi_FixedParams = 1.02;
  * =============================================================================
  * Fixed Params allows you to add a fixed param value to states and equipment.
  * With this you can create states that will add a constant value to a param.
- * Or create a posion / regeneration state that ticks a fixed number.
+ * Or create a poison / regeneration state that ticks a fixed number.
  *   Setting up <note tag>
  *       <params>
  *       Param: Value
