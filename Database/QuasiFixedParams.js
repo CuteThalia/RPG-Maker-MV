@@ -215,10 +215,10 @@ Imported.Quasi_FixedParams = 1.03;
 
   Game_BattlerBase.prototype.getCharaParamPlus = function(paramId) {
     var value = 0;
-    if (this.constructor === Game_Actor) {
+    if (this.isActor()) {
       value += this.charaParamPlus(paramId, this.actorId(), "actor");
       value += this.charaParamPlus(paramId, this._classId, "class");
-    } else if (this.constructor === Game_Enemy) {
+    } else if (this.isEnemy()) {
       value += this.charaParamPlus(paramId, this.enemyId(), "enemy");
       // if plugin for enemy class, then add enemy classes params here.
     }
