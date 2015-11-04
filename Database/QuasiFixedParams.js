@@ -1,7 +1,7 @@
 //=============================================================================
 // Quasi Fixed Params
-// Version: 1.02
-// Last Update: November 2, 2015
+// Version: 1.03
+// Last Update: November 4, 2015
 //=============================================================================
 // ** Terms of Use
 // http://quasixi.com/mv/
@@ -15,7 +15,7 @@
 //  - - http://forums.rpgmakerweb.com/index.php?/topic/48777-quasi-fixed-params/
 //=============================================================================
 var Imported = Imported || {};
-Imported.Quasi_FixedParams = 1.02;
+Imported.Quasi_FixedParams = 1.03;
 //=============================================================================
  /*:
  * @plugindesc Adds some new parameters related to Sp-Param and Ex-Param
@@ -86,17 +86,17 @@ Imported.Quasi_FixedParams = 1.02;
     if (!this.states[stateId]) {
       var params = /<params>([\s\S]*)<\/params>/i.exec($dataStates[stateId].note);
       if (params) {
-        this.states[stateId] = stringToObjAry(params[0]);
+        this.states[stateId] = stringToObjAry(params[1]);
       } else {
-        this.states[stateId] = false;
+        this.states[stateId] = 0;
       }
     }
     return this.states[stateId];
   };
 
   Params.equips = {};
-  Params.equips[0] = {};
-  Params.equips[1] = {};
+  Params.equips[0] = {}; // weapons
+  Params.equips[1] = {}; // armors
   Params.equipParamsPlus = function(equipId, isWeapon) {
     if (isWeapon) {
       var data = this.equips[0];
@@ -108,12 +108,39 @@ Imported.Quasi_FixedParams = 1.02;
     if (!data[equipId]) {
       var params = /<params>([\s\S]*)<\/params>/i.exec(note);
       if (params) {
-        data[equipId] = stringToObjAry(params[0]);
+        data[equipId] = stringToObjAry(params[1]);
       } else {
-        data[equipId] = false;
+        data[equipId] = 0;
       }
     }
     return data[equipId];
+  };
+
+  Params.charas = {};
+  Params.charas[0] = {}; // actors
+  Params.charas[1] = {}; // classes
+  Params.charas[2] = {}; // enemies
+  Params.charaParamsPlus = function(charaId, type) {
+    if (type === "actor") {
+      var data = this.charas[0];
+      var note = $dataActors[charaId].note;
+    } else if (type === "class") {
+      var data = this.charas[1];
+      var note = $dataClasses[charaId].note;
+    } else if (type === "enemy") {
+      var data = this.charas[2];
+      var note = $dataEnemies[charaId].note;
+    }
+    if (!data[charaId]) {
+      var params = /<params>([\s\S]*)<\/params>/i.exec(note);
+      if (params) {
+        data[charaId] = stringToObjAry(params[1]);
+      } else {
+        data[charaId] = 0;
+      }
+
+    }
+    return data[charaId];
   };
 
   function stringToObjAry(string) {
@@ -161,6 +188,7 @@ Imported.Quasi_FixedParams = 1.02;
     var value = Alias_Game_BattlerBase_param.call(this, paramId);
     value += this.stateParamPlus(paramId);
     value += this.equipParamPlus(paramId);
+    value += this.getCharaParamPlus(paramId);
     var maxValue = this.paramMax(paramId);
     var minValue = this.paramMin(paramId);
     return Math.round(value.clamp(minValue, maxValue));
@@ -177,15 +205,41 @@ Imported.Quasi_FixedParams = 1.02;
         value += eval(params[paramId]);
       }
     }
-    return value;
+    return Number(value || 0);
   };
 
   Game_BattlerBase.prototype.equipParamPlus = function(paramId) {
     return 0;
   };
 
+  Game_BattlerBase.prototype.getCharaParamPlus = function(paramId) {
+    var value = 0;
+    if (this.constructor === Game_Actor) {
+      value += this.charaParamPlus(paramId, this.actorId(), "actor");
+      value += this.charaParamPlus(paramId, this._classId, "class");
+    } else if (this.constructor === Game_Enemy) {
+      value += this.charaParamPlus(paramId, this.enemyId(), "enemy");
+      // if plugin for enemy class, then add enemy classes params here.
+    }
+    return Number(value || 0);
+  };
+
+  Game_BattlerBase.prototype.charaParamPlus = function(paramId, charaId, type) {
+    if (type) {
+      var value = 0;
+      var params = Params.charaParamsPlus(charaId, type);
+      if (params[paramId]) {
+        var v = $gameVariables._data;
+        var a = this;
+        value += eval(params[paramId]);
+      }
+    }
+    return Number(value || 0);
+  };
+
   Game_BattlerBase.prototype.qParam = function(qParamId) {
-    return Number(this.stateParamPlus(qParamId + 8) + this.equipParamPlus(qParamId + 8) || 0);
+    return Number(this.stateParamPlus(qParamId + 8) + this.equipParamPlus(qParamId + 8) +
+                  this.charaParamPlus(qParamId + 8) || 0);
   };
 
   var Alias_Game_BattlerBase_skillMpCost = Game_BattlerBase.prototype.skillMpCost;
@@ -243,7 +297,7 @@ Imported.Quasi_FixedParams = 1.02;
         }
       }
     }, this);
-    return value;
+    return Number(value || 0);
   };
 
   var Alias_Game_Actor_basicFloorDamage = Game_Actor.prototype.basicFloorDamage;
