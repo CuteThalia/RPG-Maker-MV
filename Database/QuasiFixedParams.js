@@ -1,6 +1,6 @@
 //=============================================================================
 // Quasi Fixed Params
-// Version: 1.03
+// Version: 1.04
 // Last Update: November 4, 2015
 //=============================================================================
 // ** Terms of Use
@@ -15,7 +15,7 @@
 //  - - http://forums.rpgmakerweb.com/index.php?/topic/48777-quasi-fixed-params/
 //=============================================================================
 var Imported = Imported || {};
-Imported.Quasi_FixedParams = 1.03;
+Imported.Quasi_FixedParams = 1.04;
 //=============================================================================
  /*:
  * @plugindesc Adds some new parameters related to Sp-Param and Ex-Param
@@ -240,7 +240,7 @@ Imported.Quasi_FixedParams = 1.03;
 
   Game_BattlerBase.prototype.qParam = function(qParamId) {
     return Number(this.stateParamPlus(qParamId + 8) + this.equipParamPlus(qParamId + 8) +
-                  this.charaParamPlus(qParamId + 8) || 0);
+                  this.getCharaParamPlus(qParamId + 8) || 0);
   };
 
   var Alias_Game_BattlerBase_skillMpCost = Game_BattlerBase.prototype.skillMpCost;
