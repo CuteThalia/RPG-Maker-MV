@@ -1,7 +1,7 @@
 //============================================================================
 // Quasi Movement
-// Version: 1.02
-// Last Update: November 4, 2015
+// Version: 1.03
+// Last Update: November 5, 2015
 //============================================================================
 // ** Terms of Use
 // http://quasixi.com/mv/
@@ -18,7 +18,7 @@
 //============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_Movement = 1.02;
+Imported.Quasi_Movement = 1.03;
 
 //=============================================================================
  /*:
@@ -132,8 +132,11 @@ Imported.Quasi_Movement = 1.02;
  *       </collider>
  *     Where 5 is the default box if a box isn't set for a direction. And X is
  *     the box for that direction. Direction can be 2, 4, 6 or 8.
- *     Type can be box or circle (CIRCLE NOT YET FUNCTIONAL)
+ *     Type can be box or circle
  *     * Resets on page change
+ *
+ *   A good circle collider for 48x48 sprites:
+ *       <collider=circle,36,24,6,24>
  *
  *   Setting default OX and OY values for events <Comment>
  *       <ox=X>
@@ -562,8 +565,8 @@ Imported.Quasi_Movement = 1.02;
   Circle_Collider.prototype.containsPoint = function(x, y) {
     var h = this.center.x;
     var k = this.center.y;
-    var xOverRx = Math.pow(2, x - h) / Math.pow(2, this.radiusX);
-    var yOverRy = Math.pow(2, y - k) / Math.pow(2, this.radiusY);
+    var xOverRx = Math.pow(x - h, 2) / Math.pow(this.radiusX, 2);
+    var yOverRy = Math.pow(y - k, 2) / Math.pow(this.radiusY, 2);
     return xOverRx + yOverRy <= 1;
   };
 
@@ -931,20 +934,62 @@ Imported.Quasi_Movement = 1.02;
     }
   };
 
-  Game_Map.prototype.collisionMapPass = function(box, dir, level) {
+  Game_Map.prototype.collisionMapPass = function(collider, dir, level) {
     if (!this._collisionmap.isReady()) {
       return false;
     }
-    var x1 = Math.floor(box.edges[dir][0].x);
-    var x2 = Math.floor(box.edges[dir][1].x);
-    var y1 = Math.floor(box.edges[dir][0].y);
-    var y2 = Math.floor(box.edges[dir][1].y);
+    if (collider.isBox()) {
+      return this.collisionMapBoxPass(collider, dir, level);
+    }
+    if (collider.isCircle()) {
+      return this.collisionMapCirclePass(collider, dir, level);
+    }
+  };
+
+  Game_Map.prototype.collisionMapBoxPass = function(collider, dir, level) {
+    var x1 = Math.floor(collider.edges[dir][0].x);
+    var x2 = Math.floor(collider.edges[dir][1].x);
+    var y1 = Math.floor(collider.edges[dir][0].y);
+    var y2 = Math.floor(collider.edges[dir][1].y);
     for (var x = x1; x <= x2; x++) {
       for (var y = y1; y <= y2; y++) {
         if (this._collisionmap.getColor(x, y) === Movement.collision) {
           return false;
         }
       }
+    }
+    return true;
+  };
+
+  Game_Map.prototype.collisionMapCirclePass = function(collider, dir, level) {
+    switch (dir) {
+      case "bottom":
+        var r1 = Math.PI;
+        var r2 = Math.PI * 2;
+        var s = Math.PI / collider.width;
+        break;
+      case "left":
+        var r1 = Math.PI / 2;
+        var r2 = Math.PI;
+        var s = Math.PI / collider.height;
+        break;
+      case "right":
+        var r1 = -Math.PI / 2;
+        var r2 = Math.PI / 2;
+        var s = Math.PI / collider.height;
+        break;
+      case "top":
+        var r1 = 0;
+        var r2 = Math.PI;
+        var s = Math.PI / collider.width;
+        break;
+    }
+    while (r1 <= r2) {
+      var pos = collider.circlePosition(r1);
+      if (this._collisionmap.getColor(Math.floor(pos[0]), Math.floor(pos[1])) === Movement.collision) {
+        return false;
+      }
+      r1 += s;
     }
     return true;
   };
@@ -1411,7 +1456,8 @@ Imported.Quasi_Movement = 1.02;
   };
 
   Game_CharacterBase.prototype.update = function() {
-    if (this.collider().constructor !== Box_Collider) {
+    if (this.collider().constructor !== Box_Collider &&
+        this.collider().constructor !== Circle_Collider) {
       this.reloadBoxes();
     }
     if (this.isStopping()) {
@@ -2739,22 +2785,19 @@ Imported.Quasi_Movement = 1.02;
       if (this._colliderSprite) {
         this.removeChild(this._colliderSprite);
       }
+      this._colliderSprite = new Sprite();
+      this._colliderSprite.bitmap = new Bitmap(this.patternWidth(), this.patternHeight());
       if (this._colliderData.isCircle()) {
         var radiusX = this._colliderData.radiusX;
         var radiusY = this._colliderData.radiusY;
-        this._colliderSprite = new PIXI.Graphics();
-        this._colliderSprite.lineStyle(0);
-        this._colliderSprite.beginFill(Movement.collision, 0.5);
-        this._colliderSprite.drawEllipse(0, 0, radiusX, radiusY);
-        this._colliderSprite.endFill();
-        this._colliderSprite.x += radiusX + ox;
-        this._colliderSprite.y += radiusY + oy;
+        //var color = parseInt(Movement.collision.slice(1,7), 16);
+        this._colliderSprite.bitmap.drawEllipse(radiusX, radiusY, radiusX, radiusY, Movement.collision);
+        this._colliderSprite.x += ox;
+        this._colliderSprite.y += oy;
       } else {
-        this._colliderSprite = new Sprite();
-        this._colliderSprite.bitmap = new Bitmap(this.patternWidth(), this.patternHeight());
         this._colliderSprite.bitmap.fillRect(ox, oy, w, h, Movement.collision);
-        this._colliderSprite.opacity = 100;
       }
+      this._colliderSprite.opacity = 100;
       this._colliderSprite.x -= this.x - this._character._px;
       this._colliderSprite.x -= $gameMap.displayX() * 48;
       this._colliderSprite.y -= this.y - this._character._py + this._character.shiftY();
@@ -2855,5 +2898,18 @@ Imported.Quasi_Movement = 1.02;
       result += this._pixelData[i + c].toString(16).padZero(2);
     }
     return result;
+  };
+
+  Bitmap.prototype.drawEllipse = function(x, y, radiusX, radiusY, color) {
+      var context = this._context;
+      context.save();
+      context.fillStyle = color;
+      context.beginPath();
+      context.scale(radiusX, radiusY);
+      context.arc(1, 1, 1, 0, Math.PI * 2, false);
+      context.translate(x, y);
+      context.fill();
+      context.restore();
+      this._setDirty();
   };
 })();
