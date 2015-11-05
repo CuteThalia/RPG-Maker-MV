@@ -1,7 +1,7 @@
 //============================================================================
 // Quasi Movement
-// Version: 1.01
-// Last Update: November 1, 2015
+// Version: 1.02
+// Last Update: November 4, 2015
 //============================================================================
 // ** Terms of Use
 // http://quasixi.com/mv/
@@ -18,7 +18,7 @@
 //============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_Movement = 1.01;
+Imported.Quasi_Movement = 1.02;
 
 //=============================================================================
  /*:
@@ -76,7 +76,7 @@ Imported.Quasi_Movement = 1.01;
  * @default #0000ff
  *
  * @param Use Regions Boxes
- * @desc Set to true if you want to put bounding boxes on regions.
+ * @desc Set to true if you want to put Box Colliders on regions.
  * default: false
  * @default false
  *
@@ -106,32 +106,33 @@ Imported.Quasi_Movement = 1.01;
  * @default 36, 36, 6, 6
  *
  * @param Convert Collision Map
- * @desc Converts the collision map into bounding boxes.
+ * @desc Converts the collision map into Box Colliders.
  * Set to true or false  (Not fully supported yet, should leave false)
  * @default false
  *
  * @param Show Boxes
- * @desc Show the bounding boxes during testing.
+ * @desc Show the Box Colliders during testing.
  * Set to true or false
  * @default true
  *
  * @help
  * =============================================================================
- * ** Setting up Bounding Boxes
+ * ** Setting up Colliders
  * =============================================================================
  * The following are placed inside Player Notes or as a Comment inside the
  * event. Event box is based off it's current page. So Event can have a
  * different box depending on its page.
- *   Single Box <Note Tag>
- *       <bbox=width,height,ox,oy>
+ *   Single Collider <Note Tag>
+ *       <collider=type,width,height,ox,oy>
  *
- *   Different box based on direction <Comment>
- *       <bbox>
- *       5: width, height, ox, oy
- *       X: width, height, ox, oy
- *       </bbox>
+ *   Different collider based on direction <Comment>
+ *       <collider>
+ *       5: type, width, height, ox, oy
+ *       X: type, width, height, ox, oy
+ *       </collider>
  *     Where 5 is the default box if a box isn't set for a direction. And X is
  *     the box for that direction. Direction can be 2, 4, 6 or 8.
+ *     Type can be box or circle (CIRCLE NOT YET FUNCTIONAL)
  *     * Resets on page change
  *
  *   Setting default OX and OY values for events <Comment>
@@ -265,11 +266,11 @@ Imported.Quasi_Movement = 1.01;
     this.collision  = parameters['Collision'];
     this.water1     = parameters['Water Collision'];
     this.water2     = parameters['Deep Water Collision'];
-    this.playerBox  = stringToIntAry(parameters['Player Box']);
-    this.eventBox   = stringToIntAry(parameters['Event Box']);
-    this.boatBox    = stringToIntAry(parameters['Boat Box']);
-    this.shipBox    = stringToIntAry(parameters['Ship Box']);
-    this.airshipBox = stringToIntAry(parameters['Airship Box']);
+    this.playerBox  = stringToAry(parameters['Player Box']);
+    this.eventBox   = stringToAry(parameters['Event Box']);
+    this.boatBox    = stringToAry(parameters['Boat Box']);
+    this.shipBox    = stringToAry(parameters['Ship Box']);
+    this.airshipBox = stringToAry(parameters['Airship Box']);
     this.useRegions = (parameters['Use Regions Boxes'].toLowerCase() === 'true');
     this.convert    = (parameters['Convert Collision Map'].toLowerCase() === 'true');
     this.showBoxes  = (parameters['Show Boxes'].toLowerCase() === 'true');
@@ -330,9 +331,15 @@ Imported.Quasi_Movement = 1.01;
 
   Movement.proccessParameters();
 
-  function stringToIntAry(string) {
+  function stringToAry(string) {
     var ary = string.split(',');
-    ary = ary.map(function(s) { return Number(s || 0); });
+    ary = ary.map(function(s) {
+      s = s.replace(/\s+/g, '');
+      if (/^[0-9]+$/.test(s)) {
+        return Number(s || 0);
+      }
+      return s;
+    });
     return ary;
   };
 
@@ -343,33 +350,60 @@ Imported.Quasi_Movement = 1.01;
     ary.forEach(function(e, i, a) {
       var s = /^(.*):(.*)/.exec(e);
       if (s) {
-        obj[s[1]] = stringToIntAry(s[2]);
+        obj[s[1]] = stringToAry(s[2]);
       }
     });
     return obj;
   };
 
+  var Alias_DataManager_saveGame = DataManager.saveGame;
+  DataManager.saveGame = function(savefileId) {
+    $gameMap.disposeCollisionmap();
+    return Alias_DataManager_saveGame.call(this, savefileId);
+  };
+
+  var Alias_Scene_Save_onSaveSuccess = Scene_Save.prototype.onSaveSuccess;
+  Scene_Save.prototype.onSaveSuccess = function() {
+    Alias_Scene_Save_onSaveSuccess.call(this);
+    $gameMap.reloadAllBoxes();
+  };
+
+  var Alias_Scene_Map_onMapLoaded = Scene_Map.prototype.onMapLoaded;
+  Scene_Map.prototype.onMapLoaded = function() {
+    Alias_Scene_Map_onMapLoaded.call(this);
+    $gameMap.reloadAllBoxes();
+  }
+
   //-----------------------------------------------------------------------------
-  // Bounding_Box
+  // Box_Collider
   //
-  // This class handles bounding boxes for characters.
+  // This class handles Box Colliders for characters.
 
-  function Bounding_Box() {
-      this.initialize.apply(this, arguments);
+  function Box_Collider() {
+    this.initialize.apply(this, arguments);
+  };
+  Box_Collider.prototype.constructor = Box_Collider;
+
+  Box_Collider.prototype.initialize = function(w, h, ox, oy, shift_y) {
+    this.width   = w;
+    this.height  = h;
+    this.ox      = ox || 0;
+    this.oy      = oy || 0;
+    this.shift_y = shift_y || 0;
+    this.x = this.y = 0;
+    this.center;
+    this.vertices(true);
   };
 
-  Bounding_Box.prototype.initialize = function(w, h, ox, oy, shift_y) {
-      this.width   = w;
-      this.height  = h;
-      this.ox      = ox || 0;
-      this.oy      = oy || 0;
-      this.shift_y = shift_y || 0;
-      this.x = this.y = 0;
-      this.center;
-      this.vertices(true);
+  Box_Collider.prototype.isCircle = function() {
+    return false;
   };
 
-  Bounding_Box.prototype.moveto = function(x, y) {
+  Box_Collider.prototype.isBox = function() {
+    return true;
+  };
+
+  Box_Collider.prototype.moveto = function(x, y) {
     if (x !== this.x || y !== this.y){
       this.x = x;
       this.y = y;
@@ -377,7 +411,7 @@ Imported.Quasi_Movement = 1.01;
     }
   };
 
-  Bounding_Box.prototype.vertices = function(reset) {
+  Box_Collider.prototype.vertices = function(reset) {
     if (reset || !this._vertices){
       var range_x = {};
       range_x.min = this.x + this.ox;
@@ -403,7 +437,7 @@ Imported.Quasi_Movement = 1.01;
     return this._vertices;
   };
 
-  Bounding_Box.prototype.gridEdge = function(direction) {
+  Box_Collider.prototype.gridEdge = function(direction) {
     if (!direction) {
       var edge1 = this.edges['top'];
       var edge2 = this.edges['bottom'];
@@ -419,7 +453,10 @@ Imported.Quasi_Movement = 1.01;
     return [p1, p2];
   };
 
-  Bounding_Box.prototype.intersects = function(other) {
+  Box_Collider.prototype.intersects = function(other) {
+    if (other.isCircle()) {
+      return this.intersectsWithCircle(other);
+    }
     var otherVertices = other._vertices;
     var x1min = this._vertices[0].x;
     var x1max = this._vertices[1].x;
@@ -434,7 +471,24 @@ Imported.Quasi_Movement = 1.01;
     return insideX && insideY;
   };
 
-  Bounding_Box.prototype.inside = function(other) {
+  Box_Collider.prototype.intersectsWithCircle = function(circle) {
+    if (this.containsPoint(circle.center.x, circle.center.y)) {
+      return true;
+    }
+    var any;
+    for (var i = 0; i < this._vertices.length; i++) {
+      if (circle.containsPoint(this._vertices[i].x, this._vertices[i].y)) {
+        any = true;
+        break;
+      }
+    }
+    if (any) {
+      return true;
+    }
+    return false;
+  };
+
+  Box_Collider.prototype.inside = function(other) {
     var otherVertices = other._vertices;
     var x2min = otherVertices[0].x;
     var x2max = otherVertices[1].x;
@@ -451,7 +505,7 @@ Imported.Quasi_Movement = 1.01;
     return pass === 4;
   };
 
-  Bounding_Box.prototype.containsPoint = function(x, y) {
+  Box_Collider.prototype.containsPoint = function(x, y) {
     var x1min = this._vertices[0].x;
     var x1max = this._vertices[1].x;
     var y1min = this._vertices[0].y;
@@ -504,24 +558,41 @@ Imported.Quasi_Movement = 1.01;
 
   var Alias_Game_Map_Setup = Game_Map.prototype.setup;
   Game_Map.prototype.setup = function(mapId) {
-      Alias_Game_Map_Setup.call(this, mapId);
-      this._tileBoxes = new Array(this.width());
-      for (var x = 0; x < this._tileBoxes.length; x++) {
-        this._tileBoxes[x] = [];
-        for (var y = 0; y < this.height(); y++) {
-          this._tileBoxes[x].push([]);
-        }
+    Alias_Game_Map_Setup.call(this, mapId);
+    this.reloadAllBoxes();
+  };
+
+  Game_Map.prototype.reloadAllBoxes = function() {
+    delete this._tileBoxes;
+    delete this._characterGrid;
+    this.reloadTileBoxes();
+    for (var i = 0; i < this.events().length; i++) {
+      this.events()[i].reloadBoxes();
+    }
+    $gamePlayer.reloadBoxes();
+    $gamePlayer.followers().forEach(function(follower) {
+      follower.reloadBoxes();
+    });
+  };
+
+  Game_Map.prototype.reloadTileBoxes = function() {
+    this._tileBoxes = new Array(this.width());
+    for (var x = 0; x < this._tileBoxes.length; x++) {
+      this._tileBoxes[x] = [];
+      for (var y = 0; y < this.height(); y++) {
+        this._tileBoxes[x].push([]);
       }
-      this._characterGrid = new Array(this.width());
-      for (var x = 0; x < this._characterGrid.length; x++) {
-        this._characterGrid[x] = [];
-        for (var y = 0; y < this.height(); y++) {
-          this._characterGrid[x].push([]);
-        }
+    }
+    this._characterGrid = new Array(this.width());
+    for (var x = 0; x < this._characterGrid.length; x++) {
+      this._characterGrid[x] = [];
+      for (var y = 0; y < this.height(); y++) {
+        this._characterGrid[x].push([]);
       }
-      this.setupTileBoxes();
-      this.setupCollisionmap();
-      this.setupRegionmap();
+    }
+    this.setupTileBoxes();
+    this.setupCollisionmap();
+    this.setupRegionmap();
   };
 
   Game_Map.prototype.flagAt = function(x, y) {
@@ -596,11 +667,11 @@ Imported.Quasi_Movement = 1.01;
     }
     var tilebox = [];
     if (boxData[0].constructor === Array){
-      var makeTileBox = Game_Map.prototype.makeTileBox;
+      //var makeTileBox = Game_Map.prototype.makeTileBox;
       boxData.forEach(function(box) {
-        var newBox = makeTileBox.call(this, x, y, flag, box);
+        var newBox = this.makeTileBox(x, y, flag, box);
         tilebox.push(newBox);
-      });
+      }, this);
     } else {
       var newBox = this.makeTileBox(x, y, flag, boxData);
       tilebox.push(newBox);
@@ -615,7 +686,7 @@ Imported.Quasi_Movement = 1.01;
     var oy = boxData[3] || 0;
     var w  = boxData[0];
     var h  = boxData[1];
-    var newBox = new Bounding_Box(w, h, ox, oy);
+    var newBox = new Box_Collider(w, h, ox, oy);
     newBox.moveto(x1, y1);
     newBox.flag      = flag;
     newBox.isLadder  = flag & 0x20;
@@ -654,6 +725,15 @@ Imported.Quasi_Movement = 1.01;
       if (Movement.showBoxes && $gameTemp.isPlaytest()) {} {
         this.drawTileBoxes();
       }
+    }
+  };
+
+  Game_Map.prototype.disposeCollisionmap = function() {
+    if (this._collisionmap) {
+      delete this._collisionmap;
+    }
+    if (this._regionmap) {
+      delete this._regionmap;
     }
   };
 
@@ -734,7 +814,7 @@ Imported.Quasi_Movement = 1.01;
           }
           var w = starting_x - ending_x + 1;
           var h = y - temp_y + 1;
-          var newBox = new Bounding_Box(w, h);
+          var newBox = new Box_Collider(w, h);
           newBox.moveto(ending_x, temp_y);
           newBox.color = color;
           boxes.push(newBox);
@@ -867,7 +947,7 @@ Imported.Quasi_Movement = 1.01;
   };
 
   Game_Map.prototype.updateCharacterGrid = function(chara, prev) {
-    var box   = chara.boundingBox();
+    var box   = chara.collider();
     var edge = box.gridEdge();
     var x1   = edge[0];
     var x2   = edge[1];
@@ -1032,7 +1112,7 @@ Imported.Quasi_Movement = 1.01;
   };
 
   Game_CharacterBase.prototype.gridChanged = function() {
-    return this._gridPosition !== this.boundingBox().gridEdge();
+    return this._gridPosition !== this.collider().gridEdge();
   };
 
   var Alias_Game_CharacterBase_setPosition = Game_CharacterBase.prototype.setPosition;
@@ -1045,8 +1125,8 @@ Imported.Quasi_Movement = 1.01;
         return;
       }
     }
-    if (!this._boundingBox) {
-      this.boundingBox();
+    if (!this._collider) {
+      this.collider();
     }
     this.moveAllBoxes(this._px, this._py);
   };
@@ -1062,8 +1142,8 @@ Imported.Quasi_Movement = 1.01;
     this._py = character._py;
     this._realPX = character._realPX;
     this._realPY = character._realPY;
-    if (!this._boundingBox) {
-      this.boundingBox();
+    if (!this._collider) {
+      this.collider();
     }
     this.moveAllBoxes(this._px, this._py);
   };
@@ -1084,7 +1164,7 @@ Imported.Quasi_Movement = 1.01;
       return false;
     }
     if ($gameMap.isLoopHorizontal() || $gameMap.isLoopVertical()) {
-      var edge = this.boundingBox(dir).gridEdge();
+      var edge = this.collider(dir).gridEdge();
       var x2   = edge[0];
       var x3   = edge[1];
       var y2   = edge[2];
@@ -1095,7 +1175,7 @@ Imported.Quasi_Movement = 1.01;
         var h = $gameMap.height() * Movement.tileSize;
         x1 = x2 < 0 ? x1 + w : (x3 >= $gameMap.width() - 1 ? x1 - w : x1);
         y1 = y2 < 0 ? y1 + h : (y3 >= $gameMap.height() - 1 ? y1 - h : y1);
-        this.boundingBox(dir).moveto(x1, y1);
+        this.collider(dir).moveto(x1, y1);
         if (!this.collisionCheck(x1, y1, dir, dist)) {
           return false;
         }
@@ -1116,25 +1196,25 @@ Imported.Quasi_Movement = 1.01;
     var dist = dist / 2 || this.moveTiles() / 2;
     var x1 = $gameMap.roundPXWithDirection(x, this.reverseDir(dir), dist);
     var y1 = $gameMap.roundPYWithDirection(y, this.reverseDir(dir), dist);
-    this.boundingBox(dir).moveto(x1, y1);
+    this.collider(dir).moveto(x1, y1);
     if (this.collideWithTileBox(dir)) {
       return false;
     }
     if (!Movement.convert) {
       var edge = {2: "bottom", 4: "left", 6: "right", 8: "top"};
-      if (!$gameMap.collisionMapPass(this.boundingBox(dir), edge[dir])) {
+      if (!$gameMap.collisionMapPass(this.collider(dir), edge[dir])) {
         return false;
       }
     }
     if (this.collideWithCharacter(dir)) {
       return false;
     }
-    this.boundingBox(dir).moveto(x, y);
+    this.collider(dir).moveto(x, y);
     return true;
   };
 
   Game_CharacterBase.prototype.collisionCheck = function(x, y, dir, dist) {
-    this.boundingBox(dir).moveto(x, y);
+    this.collider(dir).moveto(x, y);
     if (!this.valid(dir)) {
       return false;
     }
@@ -1151,7 +1231,7 @@ Imported.Quasi_Movement = 1.01;
     }
     if (!Movement.convert) {
       var edge = {2: "bottom", 4: "left", 6: "right", 8: "top"};
-      if (!$gameMap.collisionMapPass(this.boundingBox(dir), edge[dir])) {
+      if (!$gameMap.collisionMapPass(this.collider(dir), edge[dir])) {
         return false;
       }
     }
@@ -1162,7 +1242,7 @@ Imported.Quasi_Movement = 1.01;
   };
 
   Game_CharacterBase.prototype.valid = function(d) {
-    var edge = this.boundingBox(d).gridEdge();
+    var edge = this.collider(d).gridEdge();
     var x1   = edge[0];
     var x2   = edge[1];
     var y1   = edge[2];
@@ -1183,7 +1263,7 @@ Imported.Quasi_Movement = 1.01;
   };
 
   Game_CharacterBase.prototype.collideWithTileBox = function(d) {
-    var boxes = $gameMap.getTileBoxesAt(this.boundingBox(d));
+    var boxes = $gameMap.getTileBoxesAt(this.collider(d));
     if (this._passabilityLevel === 1 || this._passabilityLevel === 2) {
       return !this.insidePassableOnlyBox(d);
     }
@@ -1191,7 +1271,7 @@ Imported.Quasi_Movement = 1.01;
       if (this.passableColors().contains(boxes[i].color)) {
         continue;
       }
-      if (this.boundingBox(d).intersects(boxes[i])) {
+      if (this.collider(d).intersects(boxes[i])) {
         return true;
       }
     }
@@ -1199,7 +1279,7 @@ Imported.Quasi_Movement = 1.01;
   };
 
   Game_CharacterBase.prototype.collideWithCharacter = function(d) {
-    var charas = $gameMap.getCharactersAt(this.boundingBox(d));
+    var charas = $gameMap.getCharactersAt(this.collider(d));
     for (var i = 0; i < charas.length; i++) {
       if (charas[i].isThrough() || charas[i] === this || !charas[i].isNormalPriority()) {
         continue;
@@ -1211,7 +1291,7 @@ Imported.Quasi_Movement = 1.01;
           }
         }
       }
-      if (this.boundingBox(d).intersects(charas[i].boundingBox())) {
+      if (this.collider(d).intersects(charas[i].collider())) {
         return true;
       }
     }
@@ -1219,21 +1299,21 @@ Imported.Quasi_Movement = 1.01;
   };
 
   Game_CharacterBase.prototype.insidePassableOnlyBox = function(d) {
-    var boxes = $gameMap.getTileBoxesAt(this.boundingBox(d));
+    var boxes = $gameMap.getTileBoxesAt(this.collider(d));
     var passboxes = [];
     if (boxes.length === 0) {
       return false;
     }
     for (var i = 0; i < boxes.length; i++) {
       if (!this.passableColors().contains(boxes[i].color)) {
-        if (this.boundingBox(d).intersects(boxes[i])) {
+        if (this.collider(d).intersects(boxes[i])) {
           return false;
         }
       }
       passboxes.push(boxes[i]);
     }
     var pass = 0;
-    var vertices = this.boundingBox(d).vertices();
+    var vertices = this.collider(d).vertices();
     for (var i = 0; i < vertices.length; i++) {
       for (var j = 0; j < passboxes.length; j++) {
         if (passboxes[j].containsPoint(vertices[i].x, vertices[i].y)) {
@@ -1279,6 +1359,9 @@ Imported.Quasi_Movement = 1.01;
   };
 
   Game_CharacterBase.prototype.update = function() {
+    if (this.collider().constructor !== Box_Collider) {
+      this.reloadBoxes();
+    }
     if (this.isStopping()) {
       this.updateStop();
     }
@@ -1354,7 +1437,7 @@ Imported.Quasi_Movement = 1.01;
 
   Game_CharacterBase.prototype.updateGridChange = function() {
     $gameMap.updateCharacterGrid(this, this._gridPosition);
-    this._gridPosition = this.boundingBox().gridEdge();
+    this._gridPosition = this.collider().gridEdge();
   };
 
   Game_CharacterBase.prototype.refreshBushDepth = function() {
@@ -1369,24 +1452,24 @@ Imported.Quasi_Movement = 1.01;
   };
 
   Game_CharacterBase.prototype.isOnLadder = function() {
-    if (!this._boundingBox) {
+    if (!this._collider) {
       return false;
     }
-    var boxes = $gameMap.getTileBoxesAt(this.boundingBox());
+    var boxes = $gameMap.getTileBoxesAt(this.collider());
     var passboxes = [];
     if (boxes.length === 0) {
       return false;
     }
     for (var i = 0; i < boxes.length; i++) {
       if (!boxes[i].isLadder) {
-        if (this.boundingBox().intersects(boxes[i])) {
+        if (this.collider().intersects(boxes[i])) {
           return false;
         }
       }
       passboxes.push(boxes[i]);
     }
     var pass = 0;
-    var vertices = this.boundingBox().vertices();
+    var vertices = this.collider().vertices();
     for (var i = 0; i < vertices.length; i++) {
       for (var j = 0; j < passboxes.length; j++) {
         if (passboxes[j].containsPoint(vertices[i].x, vertices[i].y)) {
@@ -1398,24 +1481,24 @@ Imported.Quasi_Movement = 1.01;
   };
 
   Game_CharacterBase.prototype.isOnBush = function() {
-    if (!this._boundingBox) {
+    if (!this._collider) {
       return false;
     }
-    var boxes = $gameMap.getTileBoxesAt(this.boundingBox());
+    var boxes = $gameMap.getTileBoxesAt(this.collider());
     var passboxes = [];
     if (boxes.length === 0) {
       return false;
     }
     for (var i = 0; i < boxes.length; i++) {
       if (!boxes[i].isBush) {
-        if (this.boundingBox().intersects(boxes[i])) {
+        if (this.collider().intersects(boxes[i])) {
           return false;
         }
       }
       passboxes.push(boxes[i]);
     }
     var pass = 0;
-    var vertices = this.boundingBox().vertices();
+    var vertices = this.collider().vertices();
     for (var i = 0; i < vertices.length; i++) {
       for (var j = 0; j < passboxes.length; j++) {
         if (passboxes[j].containsPoint(vertices[i].x, vertices[i].y)) {
@@ -1446,7 +1529,7 @@ Imported.Quasi_Movement = 1.01;
     } else {
       this.setDirection(d);
       this.checkEventTriggerTouchFront(d);
-      this.boundingBox(d).moveto(this._px, this._py);
+      this.collider(d).moveto(this._px, this._py);
     }
     this._moveSpeed = originalSpeed;
     if (!this.isMovementSucceeded() && this._smartMoveDir && this.constructor === Game_Player) {
@@ -1476,8 +1559,8 @@ Imported.Quasi_Movement = 1.01;
         this._followers.addMove([horz, vert], this.realMoveSpeed());
       }
     } else {
-      this.boundingBox(horz).moveto(this._px, this._py);
-      this.boundingBox(vert).moveto(this._px, this._py);
+      this.collider(horz).moveto(this._px, this._py);
+      this.collider(vert).moveto(this._px, this._py);
     }
     if (this._direction === this.reverseDir(horz)) {
       this.setDirection(horz);
@@ -1512,7 +1595,7 @@ Imported.Quasi_Movement = 1.01;
     } else {
       this.setDirection(d);
       this.checkEventTriggerTouchFront(d);
-      this.boundingBox(d).moveto(this._px, this._py);
+      this.collider(d).moveto(this._px, this._py);
     }
   };
 
@@ -1533,24 +1616,29 @@ Imported.Quasi_Movement = 1.01;
     }
   };
 
-  Game_CharacterBase.prototype.boundingBox = function(direction) {
-    var direction = direction || this._direction;
-    if (!this._boundingBox) {
-      this.setupBoundingBox(direction);
-    }
-    return this._boundingBox[direction] || this._boundingBox[5];
+  Game_CharacterBase.prototype.reloadBoxes = function() {
+    delete this._collider;
+    this.collider();
+    $gameMap.updateCharacterGrid(this, []);
+    this._gridPosition = this.collider().gridEdge();
   };
 
-  Game_CharacterBase.prototype.setupBoundingBox = function(direction) {
-    this._boundingBox = [];
+  Game_CharacterBase.prototype.collider = function(direction) {
+    var direction = direction || this._direction;
+    if (!this._collider) {
+      this.setupCollider(direction);
+    }
+    return this._collider[direction] || this._collider[5];
+  };
+
+  Game_CharacterBase.prototype.setupCollider = function(direction) {
+    this._collider = [];
     if (this.constructor === Game_Player) {
-      var box = Movement.playerBox;
-      var multibox  = /<bbox>([\s\S]*)<\/bbox>/.exec(this.notes());
-      var singlebox = /<bbox=(.*)>/.exec(this.notes());
+      var box  = Movement.playerBox;
+      var note = this.notes();
     } else if (this.constructor === Game_Event) {
-      var box = Movement.eventBox;
-      var multibox  = /<bbox>([\s\S]*)<\/bbox>/.exec(this.comments());
-      var singlebox = /<bbox=(.*)>/.exec(this.comments());
+      var box  = Movement.eventBox;
+      var note = this.comments();
     } else if (this.constructor === Game_Vehicle) {
       if (this.isBoat()) {
         var box = Movement.boatBox;
@@ -1562,21 +1650,45 @@ Imported.Quasi_Movement = 1.01;
     } else {
       var box = Movement.eventBox;
     }
+    if (note) {
+      var multibox = /<collider>([\s\S]*)<\/collider>/.exec(note);
+      if (!multibox) {
+        multibox  = /<bbox>([\s\S]*)<\/bbox>/.exec(note);
+        var oldmulti = true;
+      }
+
+      var singlebox = /<collider=(.*)>/.exec(note);
+      if (!singlebox) {
+        singlebox = /<bbox=(.*)>/.exec(note);
+        var oldsingle = true;
+      }
+    }
     if (multibox) {
       var multi = stringToObjAry(multibox[1]);
       var boxW  = box[0] || 0;
       var boxH  = box[1] || 0;
       var boxOX = box[2] || 0;
       var boxOY = box[3] || 0;
-      this._boundingBox[5] = new Bounding_Box(boxW, boxH, boxOX, boxOY, this.shiftY());
+      this._collider[5] = new Box_Collider(boxW, boxH, boxOX, boxOY, this.shiftY());
       for (var key in multi) {
         if (multi.hasOwnProperty(key)) {
           var box = multi[key];
-          var w  = box[0] || boxW;
-          var h  = box[0] || boxH;
-          var ox = typeof box[2] === 'number' ? box[2] : boxOX;
-          var oy = typeof box[3] === 'number'  ? box[3] : boxOY;
-          this._boundingBox[key] = new Bounding_Box(w, h, ox, oy, this.shiftY());
+          var t = "box";
+          var i = 0;
+          if (!oldmulti) {
+            //var t = box[0].toLowerCase();
+            var t = "box";
+            var i = 1;
+          }
+          var w  = box[0 + i] || boxW;
+          var h  = box[1 + i] || boxH;
+          var ox = typeof box[2 + i] === 'number' ? box[2 + i] : boxOX;
+          var oy = typeof box[3 + i] === 'number'  ? box[3 + i] : boxOY;
+          if (t === "box") {
+            this._collider[key] = new Box_Collider(w, h, ox, oy, this.shiftY());
+          } else if (t === "circle"){
+            this._collider[key] = new Circle_Collider(w, h, ox, oy, this.shiftY());
+          }
         }
       }
       this.moveAllBoxes(this._px, this._py);
@@ -1585,34 +1697,45 @@ Imported.Quasi_Movement = 1.01;
       var boxH  = box[1] || 0;
       var boxOX = box[2] || 0;
       var boxOY = box[3] || 0;
+      var t = "box";
+      var i = 0;
       if (singlebox) {
-        var eventBox = stringToIntAry(singlebox[1]);
-        boxW  = eventBox[0] || boxW;
-        boxH  = eventBox[1] || boxH;
-        boxOX = typeof eventBox[2] === 'number' ? eventBox[2] : boxOX;
-        boxOY = typeof eventBox[3] === 'number'  ? eventBox[3] : boxOY;
+        var newBox = stringToAry(singlebox[1]);
+        if (!oldsingle) {
+          //var t = newBox[0].toLowerCase();
+          var t = "box";
+          var i = 1;
+        }
+        boxW  = newBox[0 + i] || boxW;
+        boxH  = newBox[1 + i] || boxH;
+        boxOX = typeof newBox[2 + i] === 'number' ? newBox[2 + i] : boxOX;
+        boxOY = typeof newBox[3 + i] === 'number' ? newBox[3 + i] : boxOY;
       }
-      this._boundingBox[5] = new Bounding_Box(boxW, boxH, boxOX, boxOY, this.shiftY());
-      this._boundingBox[5].moveto(this._px, this._py);
+      if (t === "box") {
+        this._collider[5] = new Box_Collider(boxW, boxH, boxOX, boxOY, this.shiftY());
+      } else if (t === "circle") {
+        this._collider[5] = new Circle_Collider(boxW, boxH, boxOX, boxOY, this.shiftY());
+      }
+      this._collider[5].moveto(this._px, this._py);
     }
   }
 
   Game_CharacterBase.prototype.moveAllBoxes = function(newX, newY) {
     newX = typeof newX === 'number' ? newX : this._px;
     newY = typeof newY === 'number' ? newY : this._py;
-    for (var i = 0; i < this._boundingBox.length; i++) {
-      if (this._boundingBox[i]) {
-        this._boundingBox[i].moveto(newX, newY);
+    for (var i = 0; i < this._collider.length; i++) {
+      if (this._collider[i]) {
+        this._collider[i].moveto(newX, newY);
       }
     }
   };
 
   Game_CharacterBase.prototype.cx = function() {
-    return this.boundingBox().center.x;
+    return this.collider().center.x;
   };
 
   Game_CharacterBase.prototype.cy = function() {
-    return this.boundingBox().center.y;
+    return this.collider().center.y;
   };
 
   //-----------------------------------------------------------------------------
@@ -1650,7 +1773,7 @@ Imported.Quasi_Movement = 1.01;
       1: Game_Character.ROUTE_MOVE_LOWER_L,  3: Game_Character.ROUTE_MOVE_LOWER_R,
       7: Game_Character.ROUTE_MOVE_UPPER_L,  9: Game_Character.ROUTE_MOVE_UPPER_R
     }
-    settings = stringToIntAry(settings);
+    settings = stringToAry(settings);
     var dir  = settings[0];
     var amt  = settings[1];
     var mult = settings[2] || 1;
@@ -1671,7 +1794,7 @@ Imported.Quasi_Movement = 1.01;
       7: Game_Character.ROUTE_MOVE_UPPER_L,  9: Game_Character.ROUTE_MOVE_UPPER_R,
       5: Game_Character.ROUTE_MOVE_FORWARD,  0: Game_Character.ROUTE_MOVE_BACKWARD
     }
-    settings  = stringToIntAry(settings);
+    settings  = stringToAry(settings);
     var dir   = settings[0];
     var amt   = settings[1];
     var multi = settings[2] || 1;
@@ -1908,22 +2031,22 @@ Imported.Quasi_Movement = 1.01;
 
   Game_Player.prototype.startMapEvent = function(x, y, triggers, normal) {
     if (!$gameMap.isEventRunning()) {
-      var prevX = this.boundingBox().x;
-      var prevY = this.boundingBox().y;
-      this.boundingBox().moveto(x, y);
-      var charas = $gameMap.getCharactersAt(this.boundingBox());
+      var prevX = this.collider().x;
+      var prevY = this.collider().y;
+      this.collider().moveto(x, y);
+      var charas = $gameMap.getCharactersAt(this.collider());
       var events = [];
       for (var i = 0; i < charas.length; i++) {
         if (charas[i] === this || charas[i].constructor === Game_Follower ||
             charas[i].constructor === Game_Vehicle) {
           continue;
         }
-        if (this.boundingBox().intersects(charas[i].boundingBox())) {
+        if (this.collider().intersects(charas[i].collider())) {
           events.push(charas[i]);
         }
       }
       if (events.length === 0) {
-        this.boundingBox().moveto(prevX, prevY);
+        this.collider().moveto(prevX, prevY);
         return;
       }
       var cx = this.cx();
@@ -1932,7 +2055,7 @@ Imported.Quasi_Movement = 1.01;
         return a.pixelDistanceFrom(cx, cy) - b.pixelDistanceFrom(cx, cy);
       });
       var event = events[0];
-      this.boundingBox().moveto(prevX, prevY);
+      this.collider().moveto(prevX, prevY);
       if (event.isTriggerIn(triggers) && event.isNormalPriority() === normal) {
         event.start();
       }
@@ -1944,14 +2067,14 @@ Imported.Quasi_Movement = 1.01;
       var direction = this.direction();
       var destX = $gameTemp.destinationPX();
       var destY = $gameTemp.destinationPY();
-      var h = this.boundingBox().height / 2;
-      var w = this.boundingBox().width / 2;
+      var h = this.collider().height / 2;
+      var w = this.collider().width / 2;
       var mDist1 = Movement.tileSize + ([2, 8].contains(direction) ? h : w)
       var mDist2 = 2 * Movement.tileSize + ([2, 8].contains(direction) ? h : w)
       if ($gameMap.distance(this.cx(), this.cy(), destX, destY) > mDist2) {
         return false;
       }
-      if (this.boundingBox().containsPoint(destX, destY)) {
+      if (this.collider().containsPoint(destX, destY)) {
         if (this.airshipHere()) {
           if (TouchInput.isTriggered() && this.getOnOffVehicle()) {
             return true;
@@ -1995,7 +2118,7 @@ Imported.Quasi_Movement = 1.01;
       var y2 = $gameMap.roundPYWithDirection(y1, direction, this.moveTiles());
       this.startMapEvent(x2, y2, triggers, true);
       if (!$gameMap.isAnyEventStarting()) {
-        this.boundingBox().moveto(x1, y1);
+        this.collider().moveto(x1, y1);
         return this.checkCounter(triggers);
       }
     }
@@ -2007,11 +2130,11 @@ Imported.Quasi_Movement = 1.01;
     var y1 = this._py;
     var x2 = $gameMap.roundPXWithDirection(x1, direction, this.moveTiles());
     var y2 = $gameMap.roundPYWithDirection(y1, direction, this.moveTiles());
-    this.boundingBox().moveto(x2, y2);
-    var boxes = $gameMap.getTileBoxesAt(this.boundingBox());
+    this.collider().moveto(x2, y2);
+    var boxes = $gameMap.getTileBoxesAt(this.collider());
     var passboxes = [];
     if (boxes.length === 0) {
-      this.boundingBox().moveto(x1, y1);
+      this.collider().moveto(x1, y1);
       return false;
     }
     var counter;
@@ -2019,19 +2142,19 @@ Imported.Quasi_Movement = 1.01;
       if (!boxes[i].isCounter) {
         continue;
       }
-      if (this.boundingBox().intersects(boxes[i])) {
+      if (this.collider().intersects(boxes[i])) {
         counter = boxes[i];
         break;
       }
     }
-    this.boundingBox().moveto(x1, y1);
+    this.collider().moveto(x1, y1);
     if (counter) {
       if ([4, 6].contains(direction)) {
         var dist = Math.abs(counter.center.x - this.cx());
-        dist += this.boundingBox().width;
+        dist += this.collider().width;
       }  else if ([8, 2].contains(direction)) {
         var dist = Math.abs(counter.center.y - this.cy());
-        dist += this.boundingBox().height;
+        dist += this.collider().height;
       }
       var x3 = $gameMap.roundPXWithDirection(x1, direction, dist);
       var y3 = $gameMap.roundPYWithDirection(y1, direction, dist);
@@ -2077,8 +2200,8 @@ Imported.Quasi_Movement = 1.01;
     var airship;
     var x1 = this._px;
     var y1 = this._py;
-    this.boundingBox().moveto(x1, y1);
-    var charas = $gameMap.getCharactersAt(this.boundingBox());
+    this.collider().moveto(x1, y1);
+    var charas = $gameMap.getCharactersAt(this.collider());
     for (var i = 0; i < charas.length; i++) {
       if (charas[i].constructor !== Game_Vehicle) {
         continue;
@@ -2086,7 +2209,7 @@ Imported.Quasi_Movement = 1.01;
       if (!charas[i].isAirship() || !charas[i].isOnMap()) {
         continue;
       }
-      if (this.boundingBox().intersects(charas[i].boundingBox())) {
+      if (this.collider().intersects(charas[i].collider())) {
         airship = charas[i];
       }
     }
@@ -2099,8 +2222,8 @@ Imported.Quasi_Movement = 1.01;
     var y1 = this._py;
     var x2 = $gameMap.roundPXWithDirection(x1, direction, this.moveTiles() + 4);
     var y2 = $gameMap.roundPYWithDirection(y1, direction, this.moveTiles() + 4);
-    this.boundingBox().moveto(x2, y2);
-    var charas = $gameMap.getCharactersAt(this.boundingBox());
+    this.collider().moveto(x2, y2);
+    var charas = $gameMap.getCharactersAt(this.collider());
     var vehicles = [];
     for (var i = 0; i < charas.length; i++) {
       if (charas[i].constructor !== Game_Vehicle) {
@@ -2109,11 +2232,11 @@ Imported.Quasi_Movement = 1.01;
       if (charas[i].isAirship() || !charas[i].isOnMap()) {
         continue;
       }
-      if (this.boundingBox().intersects(charas[i].boundingBox())) {
+      if (this.collider().intersects(charas[i].collider())) {
         vehicles.push(charas[i]);
       }
     }
-    this.boundingBox().moveto(x1, y1);
+    this.collider().moveto(x1, y1);
     if (vehicles.length === 0) {
       return false;
     }
@@ -2133,11 +2256,11 @@ Imported.Quasi_Movement = 1.01;
     var direction = this.direction();
     if (Movement.offGrid) {
       if ([4, 6].contains(direction)) {
-        var dist = this.vehicle().boundingBox().ox - this.boundingBox().ox;
-        dist = this.boundingBox().width + (direction === 4 ? -dist : dist);
+        var dist = this.vehicle().collider().ox - this.collider().ox;
+        dist = this.collider().width + (direction === 4 ? -dist : dist);
       }  else if ([8, 2].contains(direction)) {
-        var dist = this.vehicle().boundingBox().oy - this.boundingBox().oy;
-        dist = this.boundingBox().height + (direction === 8 ? -dist : dist);
+        var dist = this.vehicle().collider().oy - this.collider().oy;
+        dist = this.collider().height + (direction === 8 ? -dist : dist);
       }
     } else {
       if ([4, 6].contains(direction)) {
@@ -2154,12 +2277,12 @@ Imported.Quasi_Movement = 1.01;
       this._followers.synchronize(this);
       this.vehicle().getOff();
       this._passabilityLevel = 0;
-      var prevX = this.vehicle().boundingBox().x;
-      var prevY = this.vehicle().boundingBox().y;
+      var prevX = this.vehicle().collider().x;
+      var prevY = this.vehicle().collider().y;
       if (!this.isInAirship()) {
         this.setThrough(true);
         this.fixedMove(direction, dist);
-        this.vehicle().boundingBox().moveto(prevX, prevY);
+        this.vehicle().collider().moveto(prevX, prevY);
         this.setTransparent(false);
       }
       this._vehicleGettingOff = true;
@@ -2201,21 +2324,21 @@ Imported.Quasi_Movement = 1.01;
   };
 
   Game_Player.prototype.isOnDamageFloor = function() {
-    var boxes = $gameMap.getTileBoxesAt(this.boundingBox());
+    var boxes = $gameMap.getTileBoxesAt(this.collider());
     var passboxes = [];
     if (boxes.length === 0) {
       return false;
     }
     for (var i = 0; i < boxes.length; i++) {
       if (!boxes[i].isDamage) {
-        if (this.boundingBox().intersects(boxes[i])) {
+        if (this.collider().intersects(boxes[i])) {
           return false;
         }
       }
       passboxes.push(boxes[i]);
     }
     var pass = 0;
-    var vertices = this.boundingBox().vertices();
+    var vertices = this.collider().vertices();
     for (var i = 0; i < vertices.length; i++) {
       for (var j = 0; j < passboxes.length; j++) {
         if (passboxes[j].containsPoint(vertices[i].x, vertices[i].y)) {
@@ -2234,11 +2357,11 @@ Imported.Quasi_Movement = 1.01;
     Game_Character.prototype.moveDiagonally.call(this, horz, vert);
   };
 
-  Game_Player.prototype.boundingBox = function(direction) {
+  Game_Player.prototype.collider = function(direction) {
     if (this._vehicleSyncd) {
-      return this.vehicle().boundingBox(direction);
+      return this.vehicle().collider(direction);
     } else {
-      return Game_Character.prototype.boundingBox.call(this, direction);
+      return Game_Character.prototype.collider.call(this, direction);
     }
   };
 
@@ -2281,11 +2404,11 @@ Imported.Quasi_Movement = 1.01;
       if (move[0].constructor === Array) {
         var collided = this.collideWithPreceding(preceding, move[0][0]) &&
                        this.collideWithPreceding(preceding, move[0][1]);
-        this.boundingBox(move[0][0]).moveto(this._px, this._py);
-        this.boundingBox(move[0][1]).moveto(this._px, this._py);
+        this.collider(move[0][0]).moveto(this._px, this._py);
+        this.collider(move[0][1]).moveto(this._px, this._py);
       } else {
         var collided = this.collideWithPreceding(preceding, move[0], move[2]);
-        this.boundingBox(move[0]).moveto(this._px, this._py);
+        this.collider(move[0]).moveto(this._px, this._py);
       }
       if (collided) {
         this._moveList.unshift(move);
@@ -2305,31 +2428,34 @@ Imported.Quasi_Movement = 1.01;
   };
 
   Game_Follower.prototype.collideWithPreceding = function(preceding, d, dist) {
+    if (!this.isVisible()){
+      return false;
+    }
     var dist = dist || this.moveTiles();
     var x1 = $gameMap.roundPXWithDirection(this._px, d, dist);
     var y1 = $gameMap.roundPYWithDirection(this._py, d, dist);
-    var charas = $gameMap.getCharactersAt(this.boundingBox(d));
+    var charas = $gameMap.getCharactersAt(this.collider(d));
     for (var i = 0; i < charas.length; i++) {
       if (charas[i] === this || charas[i] !== preceding ||
           charas[i]._direction === this.reverseDir(this.direction()) ) {
         continue;
       }
-      if (this.boundingBox(d).intersects(charas[i].boundingBox())) {
+      if (this.collider(d).intersects(charas[i].collider())) {
         return true;
       }
     }
-    this.boundingBox(d).moveto(x1, y1);
-    charas = $gameMap.getCharactersAt(this.boundingBox(d));
+    this.collider(d).moveto(x1, y1);
+    charas = $gameMap.getCharactersAt(this.collider(d));
     for (var i = 0; i < charas.length; i++) {
       if (charas[i] === this || charas[i] !== preceding ||
           charas[i]._direction === this.reverseDir(this.direction()) ) {
         continue;
       }
-      if (this.boundingBox(d).intersects(charas[i].boundingBox())) {
+      if (this.collider(d).intersects(charas[i].collider())) {
         return true;
       }
     }
-    this.boundingBox(d).moveto(this._px, this._py);
+    this.collider(d).moveto(this._px, this._py);
     return false;
   };
 
@@ -2453,7 +2579,7 @@ Imported.Quasi_Movement = 1.01;
     Alias_Game_Event_setupPageSettings.call(this);
     this.initalPosition();
     this.passabilityLevel(true);
-    this._boundingBox = null;
+    this._collider = null;
   };
 
   Game_Event.prototype.initalPosition = function() {
@@ -2492,20 +2618,20 @@ Imported.Quasi_Movement = 1.01;
   Game_Event.prototype.checkEventTriggerTouch = function(x, y) {
     if (!$gameMap.isEventRunning()) {
       if (this._trigger === 2 && !this.isJumping() && this.isNormalPriority()) {
-        var prevX = this.boundingBox().x;
-        var prevY = this.boundingBox().y;
-        this.boundingBox().moveto(x, y);
-        var charas = $gameMap.getCharactersAt(this.boundingBox());
+        var prevX = this.collider().x;
+        var prevY = this.collider().y;
+        this.collider().moveto(x, y);
+        var charas = $gameMap.getCharactersAt(this.collider());
         var player;
         for (var i = 0; i < charas.length; i++) {
           if (charas[i].constructor !== Game_Player) {
             continue;
           }
-          if (this.boundingBox().intersects(charas[i].boundingBox())) {
+          if (this.collider().intersects(charas[i].collider())) {
             player = charas[i];
           }
         }
-        this.boundingBox().moveto(prevX, prevY);
+        this.collider().moveto(prevX, prevY);
         if (player) {
           this._stopCount = 0;
           this._freqCount = this.freqThreshold();
@@ -2543,40 +2669,54 @@ Imported.Quasi_Movement = 1.01;
   var Alias_Sprite_Character_update = Sprite_Character.prototype.update;
   Sprite_Character.prototype.update = function() {
     Alias_Sprite_Character_update.call(this);
-    this.updateBoundingBox();
+    this.updatecollider();
   };
 
-  Sprite_Character.prototype.updateBoundingBox = function() {
+  Sprite_Character.prototype.updatecollider = function() {
     if (!this.bitmap.isReady()) {
       return;
     }
-    if (this._boundingBoxData !== this._character.boundingBox()) {
-      this._boundingBoxData = this._character.boundingBox();
-      var w = this._boundingBoxData.width;
-      var h = this._boundingBoxData.height;
-      var ox = this._boundingBoxData.ox;
-      var oy = this._boundingBoxData.oy;
-      if (this._boundingBoxSprite) {
-        this.removeChild(this._boundingBoxSprite);
+    if (this._colliderData !== this._character.collider()) {
+      this._colliderData = this._character.collider();
+      var w = this._colliderData.width;
+      var h = this._colliderData.height;
+      var ox = this._colliderData.ox;
+      var oy = this._colliderData.oy;
+      if (this._colliderSprite) {
+        this.removeChild(this._colliderSprite);
       }
-      this._boundingBoxSprite = new Sprite();
-      this._boundingBoxSprite.bitmap = new Bitmap(this.patternWidth(), this.patternHeight());
-      this._boundingBoxSprite.bitmap.fillRect(ox, oy, w, h, Movement.collision);
-      this._boundingBoxSprite.opacity = 100;
-      this._boundingBoxSprite.anchor.x = 0.5;
-      this._boundingBoxSprite.anchor.y = 1;
-      this.addChild(this._boundingBoxSprite);
+      if (this._colliderData.isCircle()) {
+        var radiusX = this._colliderData.radiusX;
+        var radiusY = this._colliderData.radiusY;
+        this._colliderSprite = new PIXI.Graphics();
+        this._colliderSprite.lineStyle(0);
+        this._colliderSprite.beginFill(Movement.collision, 0.5);
+        this._colliderSprite.drawEllipse(0, 0, radiusX, radiusY);
+        this._colliderSprite.endFill();
+        this._colliderSprite.x += radiusX + ox;
+        this._colliderSprite.y += radiusY + oy;
+      } else {
+        this._colliderSprite = new Sprite();
+        this._colliderSprite.bitmap = new Bitmap(this.patternWidth(), this.patternHeight());
+        this._colliderSprite.bitmap.fillRect(ox, oy, w, h, Movement.collision);
+        this._colliderSprite.opacity = 100;
+      }
+      this._colliderSprite.x -= this.x - this._character._px;
+      this._colliderSprite.x -= $gameMap.displayX() * 48;
+      this._colliderSprite.y -= this.y - this._character._py + this._character.shiftY();
+      this._colliderSprite.y -= $gameMap.displayY() * 48;
+      this.addChild(this._colliderSprite);
       if (!Movement.showBoxes) {
-        this._boundingBoxSprite.visible = false;
+        this._colliderSprite.visible = false;
       }
     }
     if (!Movement.showBoxes) {
       return;
     }
     if (this._character.constructor == Game_Follower){
-      this._boundingBoxSprite.visible = this._character.isVisible();
+      this._colliderSprite.visible = this._character.isVisible();
     } else {
-      this._boundingBoxSprite.visible = this.visible;
+      this._colliderSprite.visible = this.visible;
     }
   };
 
