@@ -516,6 +516,58 @@ Imported.Quasi_Movement = 1.02;
   };
 
   //-----------------------------------------------------------------------------
+  // Circle_Collider
+  //
+  // This class handles Circle Colliders for characters.
+
+  function Circle_Collider() {
+      this.initialize.apply(this, arguments);
+  };
+  Circle_Collider.prototype = Object.create(Box_Collider.prototype);
+  Circle_Collider.prototype.constructor = Circle_Collider;
+
+  Circle_Collider.prototype.initialize = function(w, h, ox, oy, shift_y) {
+    Box_Collider.prototype.initialize.call(this, w, h, ox, oy, shift_y);
+    this.radiusX  = w / 2;
+    this.radiusY  = h / 2;
+  };
+
+  Circle_Collider.prototype.isCircle = function() {
+    return true;
+  };
+
+  Circle_Collider.prototype.isBox = function() {
+    return false;
+  };
+
+  Circle_Collider.prototype.circlePosition = function(radians){
+    var x = this.radiusX * Math.cos(radians);
+    var y = -this.radiusY * Math.sin(radians); // Y axis is flipped
+    return [this.center.x + x, this.center.y + y];
+  };
+
+  Circle_Collider.prototype.intersects = function(other) {
+    if (other.isBox()) {
+      return other.intersectsWithCircle(this);
+    }
+    var x1 = this.center.x;
+    var x2 = other.center.x;
+    var y1 = this.center.y;
+    var y2 = other.center.y;
+    var rad = Math.atan2(-(y1 - y2), x1 - x2);
+    var pos = other.circlePosition(rad);
+    return this.containsPoint(pos[0], pos[1]);
+  };
+
+  Circle_Collider.prototype.containsPoint = function(x, y) {
+    var h = this.center.x;
+    var k = this.center.y;
+    var xOverRx = Math.pow(2, x - h) / Math.pow(2, this.radiusX);
+    var yOverRy = Math.pow(2, y - k) / Math.pow(2, this.radiusY);
+    return xOverRx + yOverRy <= 1;
+  };
+
+  //-----------------------------------------------------------------------------
   // Game_Temp
   //
   // The game object class for temporary data that is not included in save data.
@@ -1676,8 +1728,7 @@ Imported.Quasi_Movement = 1.02;
           var t = "box";
           var i = 0;
           if (!oldmulti) {
-            //var t = box[0].toLowerCase();
-            var t = "box";
+            var t = box[0].toLowerCase();
             var i = 1;
           }
           var w  = box[0 + i] || boxW;
@@ -1702,8 +1753,7 @@ Imported.Quasi_Movement = 1.02;
       if (singlebox) {
         var newBox = stringToAry(singlebox[1]);
         if (!oldsingle) {
-          //var t = newBox[0].toLowerCase();
-          var t = "box";
+          var t = newBox[0].toLowerCase();
           var i = 1;
         }
         boxW  = newBox[0 + i] || boxW;
@@ -2678,6 +2728,10 @@ Imported.Quasi_Movement = 1.02;
     }
     if (this._colliderData !== this._character.collider()) {
       this._colliderData = this._character.collider();
+      if (this._colliderData.constructor !== Box_Collider &&
+          this._colliderData.constructor !== Circle_Collider) {
+        return;
+      }
       var w = this._colliderData.width;
       var h = this._colliderData.height;
       var ox = this._colliderData.ox;
@@ -2710,7 +2764,7 @@ Imported.Quasi_Movement = 1.02;
         this._colliderSprite.visible = false;
       }
     }
-    if (!Movement.showBoxes) {
+    if (!Movement.showBoxes || !this._colliderSprite) {
       return;
     }
     if (this._character.constructor == Game_Follower){
