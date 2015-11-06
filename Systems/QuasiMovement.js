@@ -478,17 +478,13 @@ Imported.Quasi_Movement = 1.03;
     if (this.containsPoint(circle.center.x, circle.center.y)) {
       return true;
     }
-    var any;
-    for (var i = 0; i < this._vertices.length; i++) {
-      if (circle.containsPoint(this._vertices[i].x, this._vertices[i].y)) {
-        any = true;
-        break;
-      }
-    }
-    if (any) {
-      return true;
-    }
-    return false;
+    var x1 = this.center.x;
+    var x2 = circle.center.x;
+    var y1 = this.center.y;
+    var y2 = circle.center.y;
+    var rad = Math.atan2(-(y1 - y2), x1 - x2);
+    var pos = circle.circlePosition(rad);
+    return this.containsPoint(pos[0], pos[1]);
   };
 
   Box_Collider.prototype.inside = function(other) {
@@ -2821,6 +2817,7 @@ Imported.Quasi_Movement = 1.03;
   // Spriteset_Map
   //
   // The set of sprites on the map screen.
+
   var Alias_Spriteset_Map_createLowerLayer = Spriteset_Map.prototype.createLowerLayer;
   Spriteset_Map.prototype.createLowerLayer = function() {
     Alias_Spriteset_Map_createLowerLayer.call(this);
