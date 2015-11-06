@@ -1,6 +1,6 @@
 //=============================================================================
 // Quasi Params Plus
-// Version: 1.01
+// Version: 1.02
 // Last Update: November 5, 2015
 //=============================================================================
 // ** Terms of Use
@@ -16,7 +16,7 @@
 //=============================================================================
 //
 var Imported = Imported || {};
-Imported.Quasi_ParamsPlus = 1.01;
+Imported.Quasi_ParamsPlus = 1.02;
 
 //=============================================================================
  /*:
@@ -365,7 +365,7 @@ Imported.Quasi_ParamsPlus = 1.01;
 
   var Alias_Game_BattlerBase_xparam = Game_BattlerBase.prototype.xparam;
   Game_BattlerBase.prototype.xparam = function(xparamId) {
-    var value = Alias_Game_BattlerBase_xparam.call(this);
+    var value = Alias_Game_BattlerBase_xparam.call(this, xparamId);
     value += this.getRateParamPlus(xparamId);
     return value;
   };
