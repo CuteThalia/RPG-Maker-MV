@@ -429,7 +429,6 @@ Imported.Quasi_ParamsPlus = 1.01;
     if (type) {
       var value = 0;
       var params = Params.rateParamsPlus(charaId, type);
-      console.log(params);
       if (params[xparamId]) {
         var a = this;
         value += eval(params[xparamId]);
