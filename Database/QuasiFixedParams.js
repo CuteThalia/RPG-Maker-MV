@@ -74,7 +74,7 @@ Imported.Quasi_FixedParams = 1.04;
  */
 //=============================================================================
 (function() {
-  Params = {};
+  var Params = {};
   Params.id = {
     "mhp": 0,  "mmp": 1,  "atk": 2,  "def": 3,
     "mat": 4,  "mdf": 5,  "agi": 6,  "luk": 7,
