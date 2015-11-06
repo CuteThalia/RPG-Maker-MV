@@ -134,7 +134,7 @@ Imported.Quasi_ParamsPlus = 1.02;
  */
 //=============================================================================
 (function() {
-  Params = {};
+  var Params = {};
   Params.plugin = PluginManager.parameters('QuasiParamsPlus');
   Params.id = {
     "mhp": 0,  "mmp": 1,  "atk": 2,  "def": 3,
