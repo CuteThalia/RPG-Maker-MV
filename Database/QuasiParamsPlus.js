@@ -1,6 +1,6 @@
 //=============================================================================
 // Quasi Params Plus
-// Version: 1.00
+// Version: 1.01
 // Last Update: November 5, 2015
 //=============================================================================
 // ** Terms of Use
@@ -16,7 +16,7 @@
 //=============================================================================
 //
 var Imported = Imported || {};
-Imported.Quasi_ParamsPlus = 1.00;
+Imported.Quasi_ParamsPlus = 1.01;
 
 //=============================================================================
  /*:
@@ -66,10 +66,10 @@ Imported.Quasi_ParamsPlus = 1.00;
  *
  *   JSON template <JSON>
  *       [
- *     	  	{"abr": "abbreviation 1", "name": "param 1 name", "default": value},
- *     	  	{"abr": "abbreviation 2", "name": "param 2 name", "default": value}
+ *     	     {"abr": "abbreviation 1", "name": "param 1 name", "default": value},
+ *     	     {"abr": "abbreviation 2", "name": "param 2 name", "default": value}
  *       ]
- *    (Couldn't fit full json, so please see the Example json file above!)
+ *    (See the Example json file above!)
  *  Set abbreviation to the abbreviation you want to use for the new param.
  *   * Do not use any existing abbreviations ( Example: mhp, mmp, atk, ect..)
  *  Set param name to the full name of the parameter.
@@ -117,6 +117,14 @@ Imported.Quasi_ParamsPlus = 1.00;
  *     Would result in that state removes 100 hp but you will have an mp regen
  *     of 5 + value of variable 1
  *
+ *   Example of Stat to rate:
+ *      <rates>
+ *      5 agi to cri
+ *      5 agi to hit
+ *      </rates>
+ *    For every 5 agi you will gain 1% of critical and hit rate.
+ *    (Can only be used inside Actors, Classes and Enemy notes!)
+ *
  *  * value can be negative
  *  * params is not case sensative
  * =============================================================================
@@ -134,6 +142,11 @@ Imported.Quasi_ParamsPlus = 1.00;
     "hrt": 8,  "mrt": 9,  "trt": 10, "mcc": 11,
     "tcc": 12, "pdc": 13, "mdc": 14, "fdc": 15,
     "exc": 16
+  }
+  Params.xid = {
+    "hit": 0, "eva": 1, "cri": 2, "cev": 3,
+    "mev": 4, "mrf": 5, "cnt": 6, "hrg": 7,
+    "mrg": 8, "trg": 9
   }
 
   Params.states = {};
@@ -198,6 +211,33 @@ Imported.Quasi_ParamsPlus = 1.00;
     return data[charaId];
   };
 
+  Params.rates = [];
+  Params.rates[0] = {}; // actors
+  Params.rates[1] = {}; // classes
+  Params.rates[2] = {}; // enemies
+  Params.rateParamsPlus = function(charaId, type) {
+    if (type === "actor") {
+      var data = this.rates[0];
+      var note = $dataActors[charaId].note;
+    } else if (type === "class") {
+      var data = this.rates[1];
+      var note = $dataClasses[charaId].note;
+    } else if (type === "enemy") {
+      var data = this.rates[2];
+      var note = $dataEnemies[charaId].note;
+    }
+    if (!data[charaId]) {
+      var params = /<rates>([\s\S]*)<\/rates>/i.exec(note);
+      if (params) {
+        data[charaId] = this.stringToRateAry(params[1]);;
+      } else {
+        data[charaId] = {};
+      }
+
+    }
+    return data[charaId];
+  };
+
   Params.custom = [];
   Params.useCustom = (Params.plugin['Use Custom Parameters'].toLowerCase() === 'true');
   Params.loadCustomParams = function() {
@@ -232,8 +272,8 @@ Imported.Quasi_ParamsPlus = 1.00;
   Params.stringToObjAry = function(string) {
     var ary = string.split('\n');
     var obj = {};
-    ary = ary.filter(function(i) { return i != "" });
-    ary.forEach(function(e, i, a) {
+    ary = ary.filter(function(i) { return i != ""; });
+    ary.forEach(function(e) {
       var s = /^(.*):(.*)/.exec(e);
       if (s) {
         var id = Params.id[s[1].toLowerCase()];
@@ -247,6 +287,23 @@ Imported.Quasi_ParamsPlus = 1.00;
           id = 17 + i;
         }
         obj[id] = s[2];
+      }
+    });
+    return obj;
+  };
+
+  Params.stringToRateAry = function(string) {
+    var ary = string.split('\n');
+    var obj = {};
+    ary = ary.filter(function(i) { return i != ""; });
+    ary.forEach(function(e) {
+      var s = /(\d*)(.*)to(.*)/.exec(e);
+      if (s) {
+        s = s.map(function(i) { return i.replace(/\s+/g,'')});
+        var id = Params.xid[s[3].toLowerCase()];
+        var stat  = s[2].toLowerCase();
+        var value = Number(s[1] || 1);
+        obj[id] = "(a."+ stat + "/ " + value + ") / 100";
       }
     });
     return obj;
@@ -306,6 +363,13 @@ Imported.Quasi_ParamsPlus = 1.00;
     return finalValue;
   };
 
+  var Alias_Game_BattlerBase_xparam = Game_BattlerBase.prototype.xparam;
+  Game_BattlerBase.prototype.xparam = function(xparamId) {
+    var value = Alias_Game_BattlerBase_xparam.call(this);
+    value += this.getRateParamPlus(xparamId);
+    return value;
+  };
+
   Game_BattlerBase.prototype.stateParamPlus = function(paramId) {
     var value = 0;
     var states = this.states();
@@ -344,6 +408,31 @@ Imported.Quasi_ParamsPlus = 1.00;
         var v = $gameVariables._data;
         var a = this;
         value += eval(params[paramId]);
+      }
+    }
+    return Number(value || 0);
+  };
+
+  Game_BattlerBase.prototype.getRateParamPlus = function(xparamId) {
+    var value = 0;
+    if (this.isActor()) {
+      value += this.rateParamPlus(xparamId, this.actorId(), "actor");
+      value += this.rateParamPlus(xparamId, this._classId, "class");
+    } else if (this.isEnemy()) {
+      value += this.rateParamPlus(xparamId, this.enemyId(), "enemy");
+      // if plugin for enemy class, then add enemy classes params here.
+    }
+    return Number(value || 0);
+  };
+
+  Game_BattlerBase.prototype.rateParamPlus = function(xparamId, charaId, type) {
+    if (type) {
+      var value = 0;
+      var params = Params.rateParamsPlus(charaId, type);
+      console.log(params);
+      if (params[xparamId]) {
+        var a = this;
+        value += eval(params[xparamId]);
       }
     }
     return Number(value || 0);
