@@ -1,7 +1,7 @@
 //=============================================================================
 // Quasi Params Plus
-// Version: 1.02
-// Last Update: November 5, 2015
+// Version: 1.03
+// Last Update: November 6, 2015
 //=============================================================================
 // ** Terms of Use
 // http://quasixi.com/mv/
@@ -16,7 +16,7 @@
 //=============================================================================
 //
 var Imported = Imported || {};
-Imported.Quasi_ParamsPlus = 1.02;
+Imported.Quasi_ParamsPlus = 1.03;
 
 //=============================================================================
  /*:
@@ -148,6 +148,11 @@ Imported.Quasi_ParamsPlus = 1.02;
     "mev": 4, "mrf": 5, "cnt": 6, "hrg": 7,
     "mrg": 8, "trg": 9
   }
+  Params.sid = {
+    "trg": 0, "grd": 1, "rec": 2, "pha": 3,
+    "mcr": 4, "tcr": 5, "pdr": 6, "mdr": 7,
+    "fdr": 8, "exr": 9
+  }
 
   Params.states = {};
   Params.stateParamsPlus = function(stateId) {
@@ -211,25 +216,25 @@ Imported.Quasi_ParamsPlus = 1.02;
     return data[charaId];
   };
 
-  Params.rates = [];
-  Params.rates[0] = {}; // actors
-  Params.rates[1] = {}; // classes
-  Params.rates[2] = {}; // enemies
-  Params.rateParamsPlus = function(charaId, type) {
+  Params.rates = {xParam: {}, sParam: {}};
+  Params.rates["xParam"][0] = Params.rates["sParam"][0] = {}; // actors
+  Params.rates["xParam"][1] = Params.rates["sParam"][1] = {}; // classes
+  Params.rates["xParam"][2] = Params.rates["sParam"][2] = {}; // enemies
+  Params.rateParamsPlus = function(charaId, type, pType) {
     if (type === "actor") {
-      var data = this.rates[0];
+      var data = this.rates[pType][0];
       var note = $dataActors[charaId].note;
     } else if (type === "class") {
-      var data = this.rates[1];
+      var data = this.rates[pType][1];
       var note = $dataClasses[charaId].note;
     } else if (type === "enemy") {
-      var data = this.rates[2];
+      var data = this.rates[pType][2];
       var note = $dataEnemies[charaId].note;
     }
     if (!data[charaId]) {
       var params = /<rates>([\s\S]*)<\/rates>/i.exec(note);
       if (params) {
-        data[charaId] = this.stringToRateAry(params[1]);;
+        data[charaId] = this.stringToRateAry(params[1], pType);;
       } else {
         data[charaId] = {};
       }
@@ -292,7 +297,7 @@ Imported.Quasi_ParamsPlus = 1.02;
     return obj;
   };
 
-  Params.stringToRateAry = function(string) {
+  Params.stringToRateAry = function(string, pType) {
     var ary = string.split('\n');
     var obj = {};
     ary = ary.filter(function(i) { return i != ""; });
@@ -300,7 +305,11 @@ Imported.Quasi_ParamsPlus = 1.02;
       var s = /(\d*)(.*)to(.*)/.exec(e);
       if (s) {
         s = s.map(function(i) { return i.replace(/\s+/g,'')});
-        var id = Params.xid[s[3].toLowerCase()];
+        if (pType === "xParam") {
+          var id = Params.xid[s[3].toLowerCase()];
+        } else {
+          var id = Params.sid[s[3].toLowerCase()];
+        }
         var stat  = s[2].toLowerCase();
         var value = Number(s[1] || 1);
         obj[id] = "(a."+ stat + "/ " + value + ") / 100";
@@ -366,7 +375,14 @@ Imported.Quasi_ParamsPlus = 1.02;
   var Alias_Game_BattlerBase_xparam = Game_BattlerBase.prototype.xparam;
   Game_BattlerBase.prototype.xparam = function(xparamId) {
     var value = Alias_Game_BattlerBase_xparam.call(this, xparamId);
-    value += this.getRateParamPlus(xparamId);
+    value += this.getRateParamPlus(xparamId, "xParam");
+    return value;
+  };
+
+  var Alias_Game_BattlerBase_sparam = Game_BattlerBase.prototype.sparam;
+  Game_BattlerBase.prototype.sparam = function(sparamId) {
+    var value = Alias_Game_BattlerBase_sparam.call(this, sparamId);
+    value += this.getRateParamPlus(sparamId, "sParam");
     return value;
   };
 
@@ -413,25 +429,25 @@ Imported.Quasi_ParamsPlus = 1.02;
     return Number(value || 0);
   };
 
-  Game_BattlerBase.prototype.getRateParamPlus = function(xparamId) {
+  Game_BattlerBase.prototype.getRateParamPlus = function(paramId, pType) {
     var value = 0;
     if (this.isActor()) {
-      value += this.rateParamPlus(xparamId, this.actorId(), "actor");
-      value += this.rateParamPlus(xparamId, this._classId, "class");
+      value += this.rateParamPlus(paramId, this.actorId(), "actor", pType);
+      value += this.rateParamPlus(paramId, this._classId, "class", pType);
     } else if (this.isEnemy()) {
-      value += this.rateParamPlus(xparamId, this.enemyId(), "enemy");
+      value += this.rateParamPlus(paramId, this.enemyId(), "enemy", pType);
       // if plugin for enemy class, then add enemy classes params here.
     }
     return Number(value || 0);
   };
 
-  Game_BattlerBase.prototype.rateParamPlus = function(xparamId, charaId, type) {
+  Game_BattlerBase.prototype.rateParamPlus = function(paramId, charaId, type, pType) {
     if (type) {
       var value = 0;
-      var params = Params.rateParamsPlus(charaId, type);
-      if (params[xparamId]) {
+      var params = Params.rateParamsPlus(charaId, type, pType);
+      if (params[paramId]) {
         var a = this;
-        value += eval(params[xparamId]);
+        value += eval(params[paramId]);
       }
     }
     return Number(value || 0);
