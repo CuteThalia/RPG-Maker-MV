@@ -1,6 +1,6 @@
 //=============================================================================
 // Quasi Params Plus
-// Version: 1.03
+// Version: 1.04
 // Last Update: November 6, 2015
 //=============================================================================
 // ** Terms of Use
@@ -14,9 +14,9 @@
 //  - - http://quasixi.com/mv/
 //  - - http://forums.rpgmakerweb.com/index.php?/topic/48777-quasi-params-plus/
 //=============================================================================
-//
+
 var Imported = Imported || {};
-Imported.Quasi_ParamsPlus = 1.03;
+Imported.Quasi_ParamsPlus = 1.04;
 
 //=============================================================================
  /*:
@@ -217,9 +217,12 @@ Imported.Quasi_ParamsPlus = 1.03;
   };
 
   Params.rates = {xParam: {}, sParam: {}};
-  Params.rates["xParam"][0] = Params.rates["sParam"][0] = {}; // actors
-  Params.rates["xParam"][1] = Params.rates["sParam"][1] = {}; // classes
-  Params.rates["xParam"][2] = Params.rates["sParam"][2] = {}; // enemies
+  Params.rates["xParam"][0] = {}; // actors
+  Params.rates["sParam"][0] = {}; // actors
+  Params.rates["xParam"][1] = {}; // classes
+  Params.rates["sParam"][1] = {}; // classes
+  Params.rates["xParam"][2] = {}; // enemies
+  Params.rates["sParam"][2] = {}; // enemies
   Params.rateParamsPlus = function(charaId, type, pType) {
     if (type === "actor") {
       var data = this.rates[pType][0];
@@ -348,16 +351,19 @@ Imported.Quasi_ParamsPlus = 1.03;
   Game_BattlerBase.prototype.initMembers = function() {
     Alias_Game_BattlerBase_initMembers.call(this);
     this._cParamPlus = {};
-    Params.custom.forEach(function(param, index) {
-      if (param["abr"] in this) {
-        alert("Can not use the abbreviation " + param["abr"]);
-      } else {
-        var obj = {};
-        obj[param["abr"]] = { get: function() {return this.cParam(index); }, configurable: true }
-        Object.defineProperties(Game_BattlerBase.prototype, obj);
-        this._cParamPlus[index] = 0;
-      }
-    }, this);
+    if (!Params.addedCustoms) {
+      Params.custom.forEach(function(param, index) {
+        if (param["abr"] in this) {
+          alert("Can not use the abbreviation " + param["abr"]);
+        } else {
+          var obj = {};
+          obj[param["abr"]] = { get: function() {return this.cParam(index); }, configurable: true }
+          Object.defineProperties(Game_BattlerBase.prototype, obj);
+          this._cParamPlus[index] = 0;
+        }
+      }, this);
+      Params.addedCustoms = true;
+    }
   };
 
   var Alias_Game_BattlerBase_param = Game_BattlerBase.prototype.param;
