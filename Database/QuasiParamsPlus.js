@@ -1,7 +1,7 @@
 //=============================================================================
 // Quasi Params Plus
-// Version: 1.04
-// Last Update: November 6, 2015
+// Version: 1.05
+// Last Update: November 7, 2015
 //=============================================================================
 // ** Terms of Use
 // http://quasixi.com/mv/
@@ -16,7 +16,7 @@
 //=============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_ParamsPlus = 1.04;
+Imported.Quasi_ParamsPlus = 1.05;
 
 //=============================================================================
  /*:
@@ -99,6 +99,13 @@ Imported.Quasi_ParamsPlus = 1.04;
  *     the order the custom param was made. So in my example since param qpp
  *     was made first that would have an id of 0, while qpt has an id of 1.
  *     * Value can be a negative number.
+ *
+ *   These new functions can be used to get data from the new custom parameters
+ *       QuasiParams.customAbr(ID)
+ *       QuasiParams.customName(ID)
+ *       QuasiParams.customMin(ID)
+ *       QuasiParams.customMax(ID)
+ *     Set ID to the id of the custom parameter.
  * =============================================================================
  * ** Examples:
  * =============================================================================
@@ -133,22 +140,24 @@ Imported.Quasi_ParamsPlus = 1.04;
  *  - http://forums.rpgmakerweb.com/index.php?/topic/48777-quasi-params-plus/
  */
 //=============================================================================
-(function() {
+
+var QuasiParams = (function() {
   var Params = {};
+  Params.public = {};
   Params.plugin = PluginManager.parameters('QuasiParamsPlus');
-  Params.id = {
+  Params.public.id = {
     "mhp": 0,  "mmp": 1,  "atk": 2,  "def": 3,
     "mat": 4,  "mdf": 5,  "agi": 6,  "luk": 7,
     "hrt": 8,  "mrt": 9,  "trt": 10, "mcc": 11,
     "tcc": 12, "pdc": 13, "mdc": 14, "fdc": 15,
     "exc": 16
   }
-  Params.xid = {
+  Params.public.xid = {
     "hit": 0, "eva": 1, "cri": 2, "cev": 3,
     "mev": 4, "mrf": 5, "cnt": 6, "hrg": 7,
     "mrg": 8, "trg": 9
   }
-  Params.sid = {
+  Params.public.sid = {
     "trg": 0, "grd": 1, "rec": 2, "pha": 3,
     "mcr": 4, "tcr": 5, "pdr": 6, "mdr": 7,
     "fdr": 8, "exr": 9
@@ -265,15 +274,19 @@ Imported.Quasi_ParamsPlus = 1.04;
   };
   Params.loadCustomParams();
 
-  Params.customName = function(id) {
+  Params.public.customAbr = function(id) {
+    return Params.custom[id].abr;
+  };
+
+  Params.public.customName = function(id) {
     return Params.custom[id].name;
   };
 
-  Params.customMax = function(id) {
+  Params.public.customMax = function(id) {
     return Params.custom[id].max;
   };
 
-  Params.customMin = function(id) {
+  Params.public.customMin = function(id) {
     return Params.custom[id].min;
   };
 
@@ -284,7 +297,7 @@ Imported.Quasi_ParamsPlus = 1.04;
     ary.forEach(function(e) {
       var s = /^(.*):(.*)/.exec(e);
       if (s) {
-        var id = Params.id[s[1].toLowerCase()];
+        var id = Params.public.id[s[1].toLowerCase()];
         if (id === undefined) {
           var p = s[1].toLowerCase();
           for (var i = 0; i < Params.custom.length; i++) {
@@ -309,9 +322,9 @@ Imported.Quasi_ParamsPlus = 1.04;
       if (s) {
         s = s.map(function(i) { return i.replace(/\s+/g,'')});
         if (pType === "xParam") {
-          var id = Params.xid[s[3].toLowerCase()];
+          var id = Params.public.xid[s[3].toLowerCase()];
         } else {
-          var id = Params.sid[s[3].toLowerCase()];
+          var id = Params.public.sid[s[3].toLowerCase()];
         }
         var stat  = s[2].toLowerCase();
         var value = Number(s[1] || 1);
@@ -472,8 +485,8 @@ Imported.Quasi_ParamsPlus = 1.04;
 
   Game_BattlerBase.prototype.cParam = function(cParamId) {
     var value = this.qParam(cParamId + 9);
-    var min   = typeof Params.customMin(cParamId) === 'number' ? Params.customMin(cParamId) : value;
-    var max   = typeof Params.customMax(cParamId) === 'number' ? Params.customMax(cParamId) : value;
+    var min   = typeof Params.public.customMin(cParamId) === 'number' ? Params.public.customMin(cParamId) : value;
+    var max   = typeof Params.public.customMax(cParamId) === 'number' ? Params.public.customMax(cParamId) : value;
     return Math.round(value.clamp(min, max));;
   };
 
@@ -585,4 +598,6 @@ Imported.Quasi_ParamsPlus = 1.04;
     var value = Math.floor(this.item().tpGain * this.subject().tcr + this.subject().tcc);
     this.subject().gainSilentTp(value);
   };
+
+  return Params.public;
 })();
