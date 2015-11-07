@@ -302,7 +302,7 @@ Imported.Quasi_ParamsPlus = 1.03;
     var obj = {};
     ary = ary.filter(function(i) { return i != ""; });
     ary.forEach(function(e) {
-      var s = /(-?\d)(.*)to(.*)/.exec(e);
+      var s = /(-?[0-9]*)(.*)to(.*)/.exec(e);
       if (s) {
         s = s.map(function(i) { return i.replace(/\s+/g,'')});
         if (pType === "xParam") {
