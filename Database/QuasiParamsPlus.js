@@ -1,6 +1,6 @@
 //=============================================================================
 // Quasi Params Plus
-// Version: 1.05
+// Version: 1.051
 // Last Update: November 7, 2015
 //=============================================================================
 // ** Terms of Use
@@ -16,7 +16,7 @@
 //=============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_ParamsPlus = 1.05;
+Imported.Quasi_ParamsPlus = 1.051;
 
 //=============================================================================
  /*:
@@ -220,7 +220,6 @@ var QuasiParams = (function() {
       } else {
         data[charaId] = 0;
       }
-
     }
     return data[charaId];
   };
@@ -364,6 +363,9 @@ var QuasiParams = (function() {
   Game_BattlerBase.prototype.initMembers = function() {
     Alias_Game_BattlerBase_initMembers.call(this);
     this._cParamPlus = {};
+    Params.custom.forEach(function(param, index) {
+      this._cParamPlus[index] = 0;
+    }, this);
     if (!Params.addedCustoms) {
       Params.custom.forEach(function(param, index) {
         if (param["abr"] in this) {
@@ -372,7 +374,6 @@ var QuasiParams = (function() {
           var obj = {};
           obj[param["abr"]] = { get: function() {return this.cParam(index); }, configurable: true }
           Object.defineProperties(Game_BattlerBase.prototype, obj);
-          this._cParamPlus[index] = 0;
         }
       }, this);
       Params.addedCustoms = true;
@@ -477,8 +478,8 @@ var QuasiParams = (function() {
     value += this.equipParamPlus(qParamId + 8);
     value += this.getCharaParamPlus(qParamId + 8);
     if (qParamId > 8) {
-      value += Params.custom[qParamId - 9].default;
-      value += this._cParamPlus[qParamId - 9];
+      value += Params.custom[qParamId - 9].default || 0;
+      value += this._cParamPlus[qParamId - 9] || 0;
     }
     return value || 0;
   };
@@ -491,6 +492,9 @@ var QuasiParams = (function() {
   };
 
   Game_BattlerBase.prototype.addCParam = function(paramId, value) {
+    if (!this._cParamPlus[paramId]) {
+      this._cParamPlus[paramId] = 0;
+    }
     this._cParamPlus[paramId] += value;
     this.refresh();
   };
