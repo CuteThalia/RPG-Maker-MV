@@ -16,7 +16,7 @@
 //=============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_ParamsPlus = 1.051;
+Imported.Quasi_ParamsPlus = 1.052;
 
 //=============================================================================
  /*:
@@ -598,8 +598,10 @@ var QuasiParams = (function() {
     return value;
   };
 
+  var Alias_Game_Action_applyItemUserEffect = Game_Action.prototype.applyItemUserEffect;
   Game_Action.prototype.applyItemUserEffect = function(target) {
-    var value = Math.floor(this.item().tpGain * this.subject().tcr + this.subject().tcc);
+    Alias_Game_Action_applyItemUserEffect.call(this, target);
+    var value = Math.floor(this.subject().tcc);
     this.subject().gainSilentTp(value);
   };
 
