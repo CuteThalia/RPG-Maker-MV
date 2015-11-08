@@ -1,7 +1,7 @@
 //============================================================================
 // Quasi Movement
-// Version: 1.03
-// Last Update: November 5, 2015
+// Version: 1.04
+// Last Update: November 6, 2015
 //============================================================================
 // ** Terms of Use
 // http://quasixi.com/mv/
@@ -18,7 +18,7 @@
 //============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_Movement = 1.03;
+Imported.Quasi_Movement = 1.04;
 
 //=============================================================================
  /*:
@@ -59,6 +59,11 @@ Imported.Quasi_Movement = 1.03;
  * @desc Adjust the speed when moving diagonal.
  * Default: 0
  * @default 0
+ *
+ * @param Dash on Mouse
+ * @desc Auto dash on mouse clicks?
+ * Set to true or false
+ * @default true
  *
  * @param Collision
  * @desc The color for collisions in the collision map.
@@ -255,29 +260,30 @@ Imported.Quasi_Movement = 1.03;
  */
 //=============================================================================
 
-(function() {
+var QuasiMovement = (function() {
   var Movement = {};
   Movement.proccessParameters = function() {
-    var parameters  = PluginManager.parameters('QuasiMovement');
-    this.grid       = Number(parameters['Grid'] || 1);
-    this.offGrid    = (parameters['Off Grid'].toLowerCase() === 'true');
-    this.tileSize   = Number(parameters['Tile Size'] || 48);
-    this.smartMove  = Number(parameters['Smart Move'] || 0);
-    this.midPass    = (parameters['Mid Pass'].toLowerCase() === 'true');
-    this.diagonal   = (parameters['Diagonal'].toLowerCase() === 'true');
-    this.diagSpeed  = Number(parameters['Diagonal Speed'] || 0);
-    this.collision  = parameters['Collision'];
-    this.water1     = parameters['Water Collision'];
-    this.water2     = parameters['Deep Water Collision'];
-    this.playerBox  = stringToAry(parameters['Player Box']);
-    this.eventBox   = stringToAry(parameters['Event Box']);
-    this.boatBox    = stringToAry(parameters['Boat Box']);
-    this.shipBox    = stringToAry(parameters['Ship Box']);
-    this.airshipBox = stringToAry(parameters['Airship Box']);
-    this.useRegions = (parameters['Use Regions Boxes'].toLowerCase() === 'true');
-    this.convert    = (parameters['Convert Collision Map'].toLowerCase() === 'true');
-    this.showBoxes  = (parameters['Show Boxes'].toLowerCase() === 'true');
-    this.tileBoxes  = {
+    var parameters   = PluginManager.parameters('QuasiMovement');
+    this.grid        = Number(parameters['Grid'] || 1);
+    this.offGrid     = (parameters['Off Grid'].toLowerCase() === 'true');
+    this.tileSize    = Number(parameters['Tile Size'] || 48);
+    this.smartMove   = Number(parameters['Smart Move'] || 0);
+    this.midPass     = (parameters['Mid Pass'].toLowerCase() === 'true');
+    this.diagonal    = (parameters['Diagonal'].toLowerCase() === 'true');
+    this.diagSpeed   = Number(parameters['Diagonal Speed'] || 0);
+    this.dashOnMouse = (parameters['Dash on Mouse'].toLowerCase() === 'true');
+    this.collision   = parameters['Collision'];
+    this.water1      = parameters['Water Collision'];
+    this.water2      = parameters['Deep Water Collision'];
+    this.playerBox   = this.stringToAry(parameters['Player Box']);
+    this.eventBox    = this.stringToAry(parameters['Event Box']);
+    this.boatBox     = this.stringToAry(parameters['Boat Box']);
+    this.shipBox     = this.stringToAry(parameters['Ship Box']);
+    this.airshipBox  = this.stringToAry(parameters['Airship Box']);
+    this.useRegions  = (parameters['Use Regions Boxes'].toLowerCase() === 'true');
+    this.convert     = (parameters['Convert Collision Map'].toLowerCase() === 'true');
+    this.showBoxes   = (parameters['Show Boxes'].toLowerCase() === 'true');
+    this.tileBoxes   = {
       1537: [48, 6, 0, 42],
       1538: [6, 48],
       1539: [[48, 6, 0, 42], [6, 48]],
@@ -300,7 +306,9 @@ Imported.Quasi_Movement = 1.03;
       3727: [48, 48]
     };
     this.regionBoxes = {};
-    this.loadRegionBoxes();
+    if (this.useRegions) {
+      this.loadRegionBoxes();
+    }
 
     var size = this.tileSize / 48;
     for (var key in this.tileBoxes) {
@@ -332,9 +340,7 @@ Imported.Quasi_Movement = 1.03;
     xhr.send();
   };
 
-  Movement.proccessParameters();
-
-  function stringToAry(string) {
+  Movement.stringToAry = function(string) {
     var ary = string.split(',');
     ary = ary.map(function(s) {
       s = s.replace(/\s+/g, '');
@@ -346,18 +352,20 @@ Imported.Quasi_Movement = 1.03;
     return ary;
   };
 
-  function stringToObjAry(string) {
+  Movement.stringToObjAry = function(string) {
     var ary = string.split('\n');
     var obj = {};
     ary = ary.filter(function(i) { return i != "" });
     ary.forEach(function(e, i, a) {
       var s = /^(.*):(.*)/.exec(e);
       if (s) {
-        obj[s[1]] = stringToAry(s[2]);
+        obj[s[1]] = this.stringToAry(s[2]);
       }
     });
     return obj;
   };
+
+  Movement.proccessParameters();
 
   var Alias_DataManager_saveGame = DataManager.saveGame;
   DataManager.saveGame = function(savefileId) {
@@ -514,6 +522,8 @@ Imported.Quasi_Movement = 1.03;
     return insideX && insideY;
   };
 
+  Movement.Box_Collider = Box_Collider;
+
   //-----------------------------------------------------------------------------
   // Circle_Collider
   //
@@ -565,6 +575,8 @@ Imported.Quasi_Movement = 1.03;
     var yOverRy = Math.pow(y - k, 2) / Math.pow(this.radiusY, 2);
     return xOverRx + yOverRy <= 1;
   };
+
+  Movement.Circle_Collider = Circle_Collider;
 
   //-----------------------------------------------------------------------------
   // Game_Temp
@@ -1093,6 +1105,14 @@ Imported.Quasi_Movement = 1.03;
     return 0;
   };
 
+  Game_Map.prototype.adjustPX = function(x) {
+    return this.adjustX(x / Movement.tileSize) * Movement.tileSize;
+  };
+
+  Game_Map.prototype.adjustPY = function(y) {
+    return this.adjustY(y / Movement.tileSize) * Movement.tileSize;
+  };
+
   Game_Map.prototype.roundPX = function(x) {
     return this.isLoopHorizontal() ? x.mod(this.width() * Movement.tileSize) : x;
   };
@@ -1295,8 +1315,15 @@ Imported.Quasi_Movement = 1.03;
     }
     if (!Movement.convert) {
       var edge = {2: "bottom", 4: "left", 6: "right", 8: "top"};
-      if (!$gameMap.collisionMapPass(this.collider(dir), edge[dir])) {
-        return false;
+      if (dir === 5) {
+        if (!$gameMap.collisionMapPass(this.collider(dir), "top") &&
+            !$gameMap.collisionMapPass(this.collider(dir), "top")) {
+          return false;
+        }
+      } else {
+        if (!$gameMap.collisionMapPass(this.collider(dir), edge[dir])) {
+          return false;
+        }
       }
     }
     if (this.collideWithCharacter(dir)) {
@@ -1324,8 +1351,15 @@ Imported.Quasi_Movement = 1.03;
     }
     if (!Movement.convert) {
       var edge = {2: "bottom", 4: "left", 6: "right", 8: "top"};
-      if (!$gameMap.collisionMapPass(this.collider(dir), edge[dir])) {
-        return false;
+      if (dir === 5) {
+        if (!$gameMap.collisionMapPass(this.collider(dir), "top") &&
+            !$gameMap.collisionMapPass(this.collider(dir), "top")) {
+          return false;
+        }
+      } else {
+        if (!$gameMap.collisionMapPass(this.collider(dir), edge[dir])) {
+          return false;
+        }
       }
     }
     if (this.collideWithCharacter(dir)) {
@@ -1758,7 +1792,7 @@ Imported.Quasi_Movement = 1.03;
       }
     }
     if (multibox) {
-      var multi = stringToObjAry(multibox[1]);
+      var multi = Movement.stringToObjAry(multibox[1]);
       var boxW  = box[0] || 0;
       var boxH  = box[1] || 0;
       var boxOX = box[2] || 0;
@@ -1793,7 +1827,7 @@ Imported.Quasi_Movement = 1.03;
       var t = "box";
       var i = 0;
       if (singlebox) {
-        var newBox = stringToAry(singlebox[1]);
+        var newBox = Movement.stringToAry(singlebox[1]);
         if (!oldsingle) {
           var t = newBox[0].toLowerCase();
           var i = 1;
@@ -1820,6 +1854,20 @@ Imported.Quasi_Movement = 1.03;
         this._collider[i].moveto(newX, newY);
       }
     }
+  };
+
+  Game_CharacterBase.prototype.copyCollider = function() {
+    var w = this.collider().width;
+    var h = this.collider().height;
+    var ox = this.collider().ox;
+    var oy = this.collider().oy;
+    if (this.collider().isCircle()) {
+      var collider = new Circle_Collider(w, h, ox, oy, this.shiftY());
+    } else {
+      var collider = new Box_Collider(w, h, ox, oy, this.shiftY());
+    }
+    collider.moveto(this._px, this._py);
+    return collider;
   };
 
   Game_CharacterBase.prototype.cx = function() {
@@ -1865,7 +1913,7 @@ Imported.Quasi_Movement = 1.03;
       1: Game_Character.ROUTE_MOVE_LOWER_L,  3: Game_Character.ROUTE_MOVE_LOWER_R,
       7: Game_Character.ROUTE_MOVE_UPPER_L,  9: Game_Character.ROUTE_MOVE_UPPER_R
     }
-    settings = stringToAry(settings);
+    settings = Movement.stringToAry(settings);
     var dir  = settings[0];
     var amt  = settings[1];
     var mult = settings[2] || 1;
@@ -1886,7 +1934,7 @@ Imported.Quasi_Movement = 1.03;
       7: Game_Character.ROUTE_MOVE_UPPER_L,  9: Game_Character.ROUTE_MOVE_UPPER_R,
       5: Game_Character.ROUTE_MOVE_FORWARD,  0: Game_Character.ROUTE_MOVE_BACKWARD
     }
-    settings  = stringToAry(settings);
+    settings  = Movement.stringToAry(settings);
     var dir   = settings[0];
     var amt   = settings[1];
     var multi = settings[2] || 1;
@@ -2003,8 +2051,8 @@ Imported.Quasi_Movement = 1.03;
     }
   };
 
-  Game_Character.prototype.findDirectionTo = function(goalX, goalY) {
-    // Make to proper pathfinding with A*
+  Game_Character.prototype.startPathFind = function(goalX, goalY) {
+    this._pathFind = null;
     var ox  = this.cx() % this.moveTiles();
     var ox2 = goalX % this.moveTiles();
     var oy  = this.cy() % this.moveTiles();
@@ -2032,6 +2080,26 @@ Imported.Quasi_Movement = 1.03;
     return dir;
   };
 
+  Game_Character.prototype.updatePathFind = function() {
+
+  };
+
+  Game_Character.prototype.getCharasAt = function(collider, ignore) {
+    var allCharas = $gameMap.getCharactersAt(collider);
+    var charas = [];
+    var i, j;
+    ignore = ignore || function() { return false; };
+    for (i = 0, j = allCharas.length; i < j; i++) {
+      if (ignore(allCharas[i])) {
+        continue;
+      }
+      if (collider.intersects(allCharas[i].collider())) {
+        charas.push(allCharas[i])
+      }
+    }
+    return charas;
+  };
+
   //-----------------------------------------------------------------------------
   // Game_Player
   //
@@ -2043,13 +2111,51 @@ Imported.Quasi_Movement = 1.03;
   };
 
   Game_Player.prototype.locate = function(x, y) {
-      Game_Character.prototype.locate.call(this, x, y);
-      this.center(x, y);
-      this.makeEncounterCount();
-      if (this.isInVehicle()) {
-          this.vehicle().refresh();
+    Game_Character.prototype.locate.call(this, x, y);
+    this.center(x, y);
+    this.makeEncounterCount();
+    if (this.isInVehicle()) {
+        this.vehicle().refresh();
+    }
+    this._followers.synchronize(this);
+  };
+
+  var Alias_Game_Player_moveByInput = Game_Player.prototype.moveByInput;
+  Game_Player.prototype.moveByInput = function() {
+    if (!Movement.diagonal){
+      Alias_Game_Player_moveByInput.call(this);
+    } else {
+      if (!this.isMoving() && this.canMove()) {
+        var direction = Input.dir8;
+        if (direction > 0) {
+          $gameTemp.clearDestination();
+          this._pathFind = null;
+        } else if ($gameTemp.isDestinationValid()){
+          var x = $gameTemp.destinationPX();
+          var y = $gameTemp.destinationPY();
+          if (!this._pathFind) {
+            direction = this.startPathFind(x, y);
+          }
+        }
+        if ([2, 4, 6, 8].contains(direction)){
+          this.moveStraight(direction);
+        } else if ([1, 3, 7, 9].contains(direction)){
+          var diag = {1: [4, 2], 3: [6, 2], 7: [4, 8], 9: [6, 8]};
+          this.moveDiagonally(diag[direction][0], diag[direction][1]);
+        }
       }
-      this._followers.synchronize(this);
+    }
+  };
+
+  Game_Player.prototype.updateDashing = function() {
+    if (this.isMoving()) {
+      return;
+    }
+    if (this.canMove() && !this.isInVehicle() && !$gameMap.isDashDisabled()) {
+      this._dashing = this.isDashButtonPressed() || (Movement.dashOnMouse && $gameTemp.isDestinationValid());
+    } else {
+      this._dashing = false;
+    }
   };
 
   Game_Player.prototype.update = function(sceneActive) {
@@ -2059,6 +2165,9 @@ Imported.Quasi_Movement = 1.03;
     this.updateDashing();
     if (sceneActive) {
       this.moveByInput();
+      if (!this.isMoving() && this.canMove()) {
+        this.updatePathFind();
+      }
     }
     var moving = this.isMoving();
     Game_Character.prototype.update.call(this);
@@ -2123,22 +2232,13 @@ Imported.Quasi_Movement = 1.03;
 
   Game_Player.prototype.startMapEvent = function(x, y, triggers, normal) {
     if (!$gameMap.isEventRunning()) {
-      var prevX = this.collider().x;
-      var prevY = this.collider().y;
-      this.collider().moveto(x, y);
-      var charas = $gameMap.getCharactersAt(this.collider());
-      var events = [];
-      for (var i = 0; i < charas.length; i++) {
-        if (charas[i] === this || charas[i].constructor === Game_Follower ||
-            charas[i].constructor === Game_Vehicle) {
-          continue;
-        }
-        if (this.collider().intersects(charas[i].collider())) {
-          events.push(charas[i]);
-        }
-      }
+      var collider = this.copyCollider();
+      collider.moveto(x, y)
+      var self = this;
+      var events = this.getCharasAt(collider, function(e) {
+        return (e === self || e.constructor === Game_Follower || e.constructor === Game_Vehicle);
+      });
       if (events.length === 0) {
-        this.collider().moveto(prevX, prevY);
         return;
       }
       var cx = this.cx();
@@ -2147,7 +2247,6 @@ Imported.Quasi_Movement = 1.03;
         return a.pixelDistanceFrom(cx, cy) - b.pixelDistanceFrom(cx, cy);
       });
       var event = events[0];
-      this.collider().moveto(prevX, prevY);
       if (event.isTriggerIn(triggers) && event.isNormalPriority() === normal) {
         event.start();
       }
@@ -2209,8 +2308,15 @@ Imported.Quasi_Movement = 1.03;
       var x2 = $gameMap.roundPXWithDirection(x1, direction, this.moveTiles());
       var y2 = $gameMap.roundPYWithDirection(y1, direction, this.moveTiles());
       this.startMapEvent(x2, y2, triggers, true);
-      if (!$gameMap.isAnyEventStarting()) {
-        this.collider().moveto(x1, y1);
+      if ($gameMap.isAnyEventStarting) {
+        var es = $gameMap.isAnyEventStarting();
+      } else if ($gameMap.someEventStarting) {
+        var es = $gameMap.someEventStarting();
+      } else {
+        var es = true;
+        alert("Please inform Quasi that you do not have a 'isAnyEventStarting' function");
+      }
+      if (!es) {
         return this.checkCounter(triggers);
       }
     }
@@ -2290,22 +2396,14 @@ Imported.Quasi_Movement = 1.03;
 
   Game_Player.prototype.airshipHere = function() {
     var airship;
-    var x1 = this._px;
-    var y1 = this._py;
-    this.collider().moveto(x1, y1);
-    var charas = $gameMap.getCharactersAt(this.collider());
-    for (var i = 0; i < charas.length; i++) {
-      if (charas[i].constructor !== Game_Vehicle) {
-        continue;
+    var collider = this.copyCollider();
+    var airship = this.getCharasAt(collider, function(e) {
+      if (e.constructor !== Game_Vehicle) {
+        return true;
       }
-      if (!charas[i].isAirship() || !charas[i].isOnMap()) {
-        continue;
-      }
-      if (this.collider().intersects(charas[i].collider())) {
-        airship = charas[i];
-      }
-    }
-    return airship;
+      return (!e.isAirship() || !e.isOnMap());
+    });
+    return airship[0];
   };
 
   Game_Player.prototype.shipBoatThere = function() {
@@ -2314,21 +2412,14 @@ Imported.Quasi_Movement = 1.03;
     var y1 = this._py;
     var x2 = $gameMap.roundPXWithDirection(x1, direction, this.moveTiles() + 4);
     var y2 = $gameMap.roundPYWithDirection(y1, direction, this.moveTiles() + 4);
-    this.collider().moveto(x2, y2);
-    var charas = $gameMap.getCharactersAt(this.collider());
-    var vehicles = [];
-    for (var i = 0; i < charas.length; i++) {
-      if (charas[i].constructor !== Game_Vehicle) {
-        continue;
+    var collider = this.copyCollider();
+    collider.moveto(x2, y2)
+    var vehicles = this.getCharasAt(collider, function(e) {
+      if (e.constructor !== Game_Vehicle) {
+        return true;
       }
-      if (charas[i].isAirship() || !charas[i].isOnMap()) {
-        continue;
-      }
-      if (this.collider().intersects(charas[i].collider())) {
-        vehicles.push(charas[i]);
-      }
-    }
-    this.collider().moveto(x1, y1);
+      return (e.isAirship() || !e.isOnMap());
+    });
     if (vehicles.length === 0) {
       return false;
     }
@@ -2389,30 +2480,6 @@ Imported.Quasi_Movement = 1.03;
       }
     }
     return this._vehicleGettingOff;
-  };
-
-  var Alias_Game_Player_moveByInput = Game_Player.prototype.moveByInput;
-  Game_Player.prototype.moveByInput = function() {
-    if (!Movement.diagonal){
-      Alias_Game_Player_moveByInput.call(this);
-    } else {
-      if (!this.isMoving() && this.canMove()) {
-        var direction = Input.dir8;
-        if (direction > 0) {
-          $gameTemp.clearDestination();
-        } else if ($gameTemp.isDestinationValid()){
-          var x = $gameTemp.destinationPX();
-          var y = $gameTemp.destinationPY();
-          direction = this.findDirectionTo(x, y);
-        }
-        if ([2, 4, 6, 8].contains(direction)){
-          this.moveStraight(direction);
-        } else if ([1, 3, 7, 9].contains(direction)){
-          var diag = {1: [4, 2], 3: [6, 2], 7: [4, 8], 9: [6, 8]};
-          this.moveDiagonally(diag[direction][0], diag[direction][1]);
-        }
-      }
-    }
   };
 
   Game_Player.prototype.isOnDamageFloor = function() {
@@ -2605,11 +2672,11 @@ Imported.Quasi_Movement = 1.03;
   Game_Vehicle.prototype.refresh = function() {
     Alias_Game_Vehicle_refresh.call(this);
     this.setThrough(!this.isOnMap());
-  }
+  };
 
   Game_Vehicle.prototype.isOnMap = function() {
     return this._mapId === $gameMap.mapId();
-  }
+  };
 
   //-----------------------------------------------------------------------------
   // Game_Event
@@ -2744,6 +2811,12 @@ Imported.Quasi_Movement = 1.03;
         if (this._touchCount === 0 || this._touchCount >= 15) {
           var x = $gameMap.canvasToMapPX(TouchInput.x);
           var y = $gameMap.canvasToMapPY(TouchInput.y);
+          if (!Movement.offGrid) {
+            var ox  = x % Movement.tileSize;
+            var oy  = y % Movement.tileSize;
+            x -= ox;
+            y -= oy;
+          }
           $gameTemp.setPixelDestination(x, y);
         }
         this._touchCount++;
@@ -2751,6 +2824,26 @@ Imported.Quasi_Movement = 1.03;
         this._touchCount = 0;
       }
     }
+  };
+
+  Scene_Map.prototype.addTempCollider = function(collider, duration) {
+    if ($gameTemp.isPlaytest() && Movement.showBoxes) {
+      this._spriteset.addTempCollider(collider, duration || 60);
+    }
+  };
+
+  //-----------------------------------------------------------------------------
+  // Sprite_Destination
+  //
+  // The sprite for displaying the destination place of the touch input.
+
+  Sprite_Destination.prototype.updatePosition = function() {
+    var tileWidth = $gameMap.tileWidth();
+    var tileHeight = $gameMap.tileHeight();
+    var x = $gameTemp.destinationPX();
+    var y = $gameTemp.destinationPY();
+    this.x = $gameMap.adjustPX(x) + tileWidth / 2;
+    this.y = $gameMap.adjustPY(y) + tileHeight / 2;
   };
 
   //-----------------------------------------------------------------------------
@@ -2761,10 +2854,12 @@ Imported.Quasi_Movement = 1.03;
   var Alias_Sprite_Character_update = Sprite_Character.prototype.update;
   Sprite_Character.prototype.update = function() {
     Alias_Sprite_Character_update.call(this);
-    this.updatecollider();
+    if ($gameTemp.isPlaytest() && Movement.showBoxes) {
+      this.updateColliders();
+    }
   };
 
-  Sprite_Character.prototype.updatecollider = function() {
+  Sprite_Character.prototype.updateColliders = function() {
     if (!this.bitmap.isReady()) {
       return;
     }
@@ -2786,7 +2881,6 @@ Imported.Quasi_Movement = 1.03;
       if (this._colliderData.isCircle()) {
         var radiusX = this._colliderData.radiusX;
         var radiusY = this._colliderData.radiusY;
-        //var color = parseInt(Movement.collision.slice(1,7), 16);
         this._colliderSprite.bitmap.drawEllipse(radiusX, radiusY, radiusX, radiusY, Movement.collision);
         this._colliderSprite.x += ox;
         this._colliderSprite.y += oy;
@@ -2799,11 +2893,8 @@ Imported.Quasi_Movement = 1.03;
       this._colliderSprite.y -= this.y - this._character._py + this._character.shiftY();
       this._colliderSprite.y -= $gameMap.displayY() * 48;
       this.addChild(this._colliderSprite);
-      if (!Movement.showBoxes) {
-        this._colliderSprite.visible = false;
-      }
     }
-    if (!Movement.showBoxes || !this._colliderSprite) {
+    if (!this._colliderSprite) {
       return;
     }
     if (this._character.constructor == Game_Follower){
@@ -2821,7 +2912,10 @@ Imported.Quasi_Movement = 1.03;
   var Alias_Spriteset_Map_createLowerLayer = Spriteset_Map.prototype.createLowerLayer;
   Spriteset_Map.prototype.createLowerLayer = function() {
     Alias_Spriteset_Map_createLowerLayer.call(this);
-    this.createTileBoxes();
+    if ($gameTemp.isPlaytest() && Movement.showBoxes) {
+      this.createTileBoxes();
+      this._tempColliders = [];
+    }
   };
 
   Spriteset_Map.prototype.createTileBoxes = function() {
@@ -2837,17 +2931,45 @@ Imported.Quasi_Movement = 1.03;
       this._regionmap.move(0, 0, Graphics.width, Graphics.height);
       this._collisionmap.addChild(this._regionmap);
     }
-    if (!Movement.showBoxes) {
-      this._collisionmap.visible = false;
+  };
+
+  Spriteset_Map.prototype.addTempCollider = function(collider, duration) {
+    var temp = {};
+    temp.collider = collider;
+    temp.decay = duration;
+    temp.sprite = new Sprite();
+    temp.sprite.bitmap = new Bitmap(collider.width + collider.ox, collider.height + collider.oy);
+    if (collider.isCircle()) {
+      var radiusX = collider.radiusX;
+      var radiusY = collider.radiusY;
+      temp.sprite.bitmap.drawEllipse(radiusX, radiusY, radiusX, radiusY, Movement.collision);
+      temp.sprite.x += collider.ox;
+      temp.sprite.y += collider.oy;
+    } else {
+      temp.sprite.bitmap.fillRect(collider.ox, collider.oy, collider.width, collider.height, "#ffffff");
     }
+    temp.sprite.opacity = 100;
+    temp.sprite.x = collider.x;
+    temp.sprite.x -= $gameMap.displayX() * 48;
+    temp.sprite.y = collider.y;
+    temp.sprite.y -= $gameMap.displayY() * 48;
+    this._tempColliders.push(temp);
+    this.addChild(temp.sprite);
   };
 
   var Alias_Spriteset_Map_updateTilemap = Spriteset_Map.prototype.updateTilemap;
   Spriteset_Map.prototype.updateTilemap = function() {
     Alias_Spriteset_Map_updateTilemap.call(this);
-    if (!Movement.showBoxes) {
+    if ((!Movement.showBoxes && !$gameTemp.isPlaytest()) || !this._collisionmap) {
       return;
     }
+    this.updateTileBoxes();
+    if (this._tempColliders.length > 0) {
+      this.updateTempColliders();
+    }
+  };
+
+  Spriteset_Map.prototype.updateTileBoxes = function() {
     if (this._collisionmap.bitmap !== $gameMap._collisionmap) {
       this._collisionmap.bitmap = $gameMap._collisionmap;
     }
@@ -2860,6 +2982,20 @@ Imported.Quasi_Movement = 1.03;
     }
     this._collisionmap.origin.x = $gameMap.displayX() * $gameMap.tileWidth();
     this._collisionmap.origin.y = $gameMap.displayY() * $gameMap.tileHeight();
+  };
+
+  Spriteset_Map.prototype.updateTempColliders = function() {
+    var remove = [];
+    for (var i = 0; i < this._tempColliders.length; i++) {
+      if (this._tempColliders[i].decay <= 0) {
+        this.removeChild(this._tempColliders[i].sprite);
+        remove.push(i);
+      }
+      this._tempColliders[i].decay--;
+    }
+    for (var i = 0; i < remove.length; i++) {
+      this._tempColliders.splice(remove[i], 1);
+    }
   };
 
   //-----------------------------------------------------------------------------
@@ -2909,4 +3045,5 @@ Imported.Quasi_Movement = 1.03;
       context.restore();
       this._setDirty();
   };
+  return Movement;
 })();
