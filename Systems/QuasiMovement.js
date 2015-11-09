@@ -1,7 +1,7 @@
 //============================================================================
 // Quasi Movement
-// Version: 1.04
-// Last Update: November 6, 2015
+// Version: 1.05
+// Last Update: November 8, 2015
 //============================================================================
 // ** Terms of Use
 // http://quasixi.com/mv/
@@ -18,7 +18,7 @@
 //============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_Movement = 1.04;
+Imported.Quasi_Movement = 1.05;
 
 //=============================================================================
  /*:
@@ -65,6 +65,10 @@ Imported.Quasi_Movement = 1.04;
  * Set to true or false
  * @default true
  *
+ * @param =====================
+ * @desc Spacer
+ * @default
+ *
  * @param Collision
  * @desc The color for collisions in the collision map.
  * default: #ff0000 (red)
@@ -80,10 +84,9 @@ Imported.Quasi_Movement = 1.04;
  * default: #0000ff
  * @default #0000ff
  *
- * @param Use Regions Boxes
- * @desc Set to true if you want to put Box Colliders on regions.
- * default: false
- * @default false
+ * @param =====================
+ * @desc Spacer
+ * @default
  *
  * @param Player Box
  * @desc Default player box. (width, height, ox, oy)
@@ -109,6 +112,34 @@ Imported.Quasi_Movement = 1.04;
  * @desc Default airship box. (width, height, ox, oy)
  * default: 36, 36, 6, 6     (Only used for landing)
  * @default 36, 36, 6, 6
+ *
+ * @param =====================
+ * @desc Spacer
+ * @default
+ *
+ * @param JSON folder
+ * @desc Where to store JSON files.
+ * Default: data/
+ * @default data/
+ *
+ * @param Collision Map folder
+ * @desc Where to store Collision Map images.
+ * Default: img/parallaxes/
+ * @default img/parallaxes/
+ *
+ * @param Region Map folder
+ * @desc Where to store Region Map images.
+ * Default: img/parallaxes/
+ * @default img/parallaxes/
+ *
+ * @param =====================
+ * @desc Spacer
+ * @default
+ *
+ * @param Use Regions Boxes
+ * @desc Set to true if you want to put Box Colliders on regions.
+ * default: false
+ * @default false
  *
  * @param Convert Collision Map
  * @desc Converts the collision map into Box Colliders.
@@ -153,8 +184,8 @@ Imported.Quasi_Movement = 1.04;
  * ** Setting up Region Boxes
  * =============================================================================
  * To use region boxes, you first have to enabled "Use Region Boxes" in
- * the plugin settings. Next you need to create a json file inside the
- * data folder called "RegionBoxes.json"
+ * the plugin settings. Next you need to create a json file called
+ * "RegionBoxes.json" inside the folder you set for JSON folder parameter.
  *   If you do not know how to create a .json file download my sample
  *   RegionBoxes.json file:
  *       https://gist.github.com/quasixi/ff149320fd6885191d87
@@ -174,11 +205,11 @@ Imported.Quasi_Movement = 1.04;
  *     inside the quotes! Becareful with the commas ( , ) place them
  *     after } or ] only if it's not the last one in the list!
  *
- *     You can see line 156 doesn't end with a called because it's the last
- *     box in that region. line 159 does end with a comma because there's
- *     another box! But line 160 does not have a comma since it's the last
- *     box. Line 157 ends with a comma because there's another region.
- *     But line 161 does not have a comma because it's the last region.
+ *     You can see line 196 doesn't end with a called because it's the last
+ *     box in that region. line 199 does end with a comma because there is
+ *     another box! But line 200 does not have a comma since it's the last
+ *     box. Line 197 ends with a comma because there's another region.
+ *     But line 201 does not have a comma because it's the last region.
  * =============================================================================
  * ** Setting up Collision Maps
  * =============================================================================
@@ -187,13 +218,15 @@ Imported.Quasi_Movement = 1.04;
  *   Add a Collision Map <Note Tag>
  *       <cm=filename>
  *     Replace filename with the name of the collision map you want to load.
- *     Don't add the extension, and file should be location in img/parallaxs/
+ *     Don't add the extension, and file should be location in the folder you
+ *     set in the Collision Map folder parameter.
  *     * Map note tags are found in the map properties
  *
  *   Add a Region Map <Note Tag>
  *       <rm=filename>
  *     Replace filename with the name of the region map you want to load.
- *     Don't add the extension, and file should be location in img/parallaxs/
+ *     Don't add the extension, and file should be location in the folder you
+ *     set in the Region Map folder parameter.
  *     * Region maps do not effect collisions at all!
  * =============================================================================
  * ** Passability Levels
@@ -280,6 +313,9 @@ var QuasiMovement = (function() {
     this.boatBox     = this.stringToAry(parameters['Boat Box']);
     this.shipBox     = this.stringToAry(parameters['Ship Box']);
     this.airshipBox  = this.stringToAry(parameters['Airship Box']);
+    this.jFolder     = parameters['JSON folder'];
+    this.rmFolder    = parameters['Region Map folder'];
+    this.cmFolder    = parameters['Collision Map folder'];
     this.useRegions  = (parameters['Use Regions Boxes'].toLowerCase() === 'true');
     this.convert     = (parameters['Convert Collision Map'].toLowerCase() === 'true');
     this.showBoxes   = (parameters['Show Boxes'].toLowerCase() === 'true');
@@ -328,14 +364,14 @@ var QuasiMovement = (function() {
 
   Movement.loadRegionBoxes = function() {
     var xhr = new XMLHttpRequest();
-    var url = 'data/RegionBoxes.json';
+    var url = this.jFolder + 'RegionBoxes.json';
     xhr.open('GET', url, true);
     xhr.overrideMimeType('application/json');
     xhr.onload = function() {
       Movement.regionBoxes = JSON.parse(xhr.responseText);
     };
     xhr.onerror = function() {
-      alert("File: data/RegionBoxes.json not found.");
+      alert("File: " + this.jFolder + "RegionBoxes.json not found.");
     };
     xhr.send();
   };
@@ -402,6 +438,8 @@ var QuasiMovement = (function() {
     this.oy      = oy || 0;
     this.shift_y = shift_y || 0;
     this.x = this.y = 0;
+    this.zoomX = 1;
+    this.zoomY = 1;
     this.center;
     this.vertices(true);
   };
@@ -422,14 +460,24 @@ var QuasiMovement = (function() {
     }
   };
 
+  Box_Collider.prototype.scale = function(zX, zY) {
+    this.zoomX = zX;
+    this.zoomY = zY || zX;
+    this.vertices(true);
+  };
+
   Box_Collider.prototype.vertices = function(reset) {
     if (reset || !this._vertices){
+      var w  = this.width * this.zoomX;
+      var h  = this.height * this.zoomY;
+      var ox = this.ox + (this.width - w)/2;
+      var oy = this.oy + (this.height - h)/2;
       var range_x = {};
-      range_x.min = this.x + this.ox;
-      range_x.max = this.x + this.ox + this.width - 1;
+      range_x.min = this.x + ox;
+      range_x.max = this.x + ox + w - 1;
       var range_y = {};
-      range_y.min = this.y + this.oy - this.shift_y;
-      range_y.max = this.y + this.oy - this.shift_y + this.height - 1;
+      range_y.min = this.y + oy - this.shift_y;
+      range_y.max = this.y + oy - this.shift_y + h - 1;
 
       var topLeft     = new Point(range_x.min, range_y.min);
       var topRight    = new Point(range_x.max, range_y.min);
@@ -437,7 +485,7 @@ var QuasiMovement = (function() {
       var bottomRight = new Point(range_x.max, range_y.max);
 
       this.box    = [range_x, range_y];
-      this.center = new Point(topLeft.x + (this.width / 2), topLeft.y + (this.height / 2));
+      this.center = new Point(topLeft.x + (w / 2), topLeft.y + (h / 2));
       this.edges  = {};
       this.edges.left   = [topLeft, bottomLeft];
       this.edges.right  = [topRight, bottomRight];
@@ -694,20 +742,24 @@ var QuasiMovement = (function() {
       for (var y = 0; y < this.height(); y++) {
         var flags = this.tilesetFlags();
         var tiles = this.allTiles(x, y);
-        for (var i = tiles.length; i > 0; i--) {
+        for (var i = tiles.length; i >= 0; i--) {
           var flag = flags[tiles[i - 1]];
           if (flag === 16) {
             continue;
           }
-          this._tileBoxes[x][y] = this.tileBox(x, y, flag);
+          if (this._tileBoxes[x][y]) {
+            this._tileBoxes[x][y] = this._tileBoxes[x][y].concat(this.tileBox(x, y, flag));
+          } else {
+            this._tileBoxes[x][y] = this.tileBox(x, y, flag);
+          }
         }
       }
     }
   };
 
   Game_Map.prototype.tileBox = function(x, y, flag) {
-    if (Movement.regionBoxes[this.regionId(x,y)]) {
-      var regionData = Movement.regionBoxes[this.regionId(x,y)];
+    if (Movement.regionBoxes[this.regionId(x, y)]) {
+      var regionData = Movement.regionBoxes[this.regionId(x, y)];
       var boxData = [];
       for (var i = 0; i < regionData.length; i++) {
         var data = [];
@@ -730,7 +782,6 @@ var QuasiMovement = (function() {
     }
     var tilebox = [];
     if (boxData[0].constructor === Array){
-      //var makeTileBox = Game_Map.prototype.makeTileBox;
       boxData.forEach(function(box) {
         var newBox = this.makeTileBox(x, y, flag, box);
         tilebox.push(newBox);
@@ -776,7 +827,7 @@ var QuasiMovement = (function() {
       if (Movement.convert) {
         this.convertCollisionmap(cm);
       } else {
-        this._collisionmap = ImageManager.loadParallax(cm[1]);
+        this._collisionmap = ImageManager.loadBitmap(Movement.cmFolder, cm[1]);
         if (Movement.showBoxes && $gameTemp.isPlaytest()) {} {
           this._collisionmap.addLoadListener(function() {
             $gameMap.drawTileBoxes();
@@ -801,7 +852,7 @@ var QuasiMovement = (function() {
   };
 
   Game_Map.prototype.convertCollisionmap = function(cm) {
-    var img = ImageManager.loadParallax(cm[1]);
+    var img = ImageManager.loadBitmap(Movement.cmFolder, cm[1]);
     var collisionBoxes = img.addLoadListener(function() {
       var boxes = [];
       var nodes = new Array(img.height);
@@ -902,7 +953,7 @@ var QuasiMovement = (function() {
   Game_Map.prototype.setupRegionmap = function() {
     var rm = /<rm=(.*)>/i.exec($dataMap.note);
     if (rm) {
-      this._regionmap = ImageManager.loadParallax(rm[1]);
+      this._regionmap = ImageManager.loadBitmap(Movement.rmFolder, rm[1]);
     } else {
       this._regionmap = null;
     }
@@ -1100,6 +1151,9 @@ var QuasiMovement = (function() {
 
   Game_Map.prototype.getPixelRegion = function(x, y) {
     if (this._regionmap) {
+      if (!this._regionmap.isReady()) {
+        return 0;
+      }
       return this._regionmap.getColor(x || $gamePlayer.cx(), y || $gamePlayer.cy());
     }
     return 0;
@@ -1186,6 +1240,7 @@ var QuasiMovement = (function() {
     this._diagonal = false;
     this._grid = Movement.grid;
     this._gridPosition = [];
+    this._currentPosition;
     this._passabilityLevel = 0;
     this._smartMoveDir   = Movement.smartMove == 2 || Movement.smartMove == 3;
     this._smartMoveSpeed = Movement.smartMove == 1 || Movement.smartMove == 3;
@@ -1226,6 +1281,10 @@ var QuasiMovement = (function() {
 
   Game_CharacterBase.prototype.gridChanged = function() {
     return this._gridPosition !== this.collider().gridEdge();
+  };
+
+  Game_CharacterBase.prototype.positionChanged = function() {
+    return this._currentPosition !== this.collider().center;
   };
 
   var Alias_Game_CharacterBase_setPosition = Game_CharacterBase.prototype.setPosition;
@@ -1301,7 +1360,7 @@ var QuasiMovement = (function() {
     var dist = dist || this.moveTiles();
     var x1 = $gameMap.roundPXWithDirection(x, horz, dist);
     var y1 = $gameMap.roundPYWithDirection(y, vert, dist);
-    return (this.canPass(x, y, vert, dist) && this.canPass(x, y1, horz, dist)) ||
+    return (this.canPass(x, y, vert, dist) && this.canPass(x, y1, horz, dist)) &&
            (this.canPass(x, y, horz, dist) && this.canPass(x1, y, vert, dist))
   };
 
@@ -1499,8 +1558,8 @@ var QuasiMovement = (function() {
       this.updateMove();
     }
     this.updateAnimation();
-    if (this.gridChanged()) {
-      this.updateGridChange();
+    if (this.positionChanged()) {
+      this.onPositionChange();
     }
     if (this.constructor !== Game_Player) {
       if (this.stillMoving){
@@ -1561,6 +1620,13 @@ var QuasiMovement = (function() {
     } else if (this.hasStepAnime() || !this.isOriginalPattern()) {
       this._animationCount++;
     }
+  };
+
+  Game_CharacterBase.prototype.onPositionChange = function() {
+    if (this.gridChanged()) {
+      this.updateGridChange();
+    }
+    this._currentPosition = this.collider().center;
   };
 
   Game_CharacterBase.prototype.updateGridChange = function() {
@@ -3018,10 +3084,13 @@ var QuasiMovement = (function() {
     this._pixelData = this._context.getImageData(0, 0, this.width, this.height).data;
   };
 
+  // Optimized version of getPixel()
   Bitmap.prototype.getColor = function(x, y) {
     if (!this._pixelData) {
       this._setPixelData();
     }
+    x = Math.floor(x);
+    y = Math.floor(y);
     if (x >= this.width || x < 0 || y >= this.height || y < 0) {
       return "";
     }
