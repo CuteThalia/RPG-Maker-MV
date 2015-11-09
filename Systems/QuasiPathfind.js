@@ -1,7 +1,7 @@
 //============================================================================
 // Quasi Pathfind
-// Version: 1.0
-// Last Update: November 7, 2015
+// Version: 1.01
+// Last Update: November 8, 2015
 //============================================================================
 // ** Terms of Use
 // http://quasixi.com/mv/
@@ -10,6 +10,7 @@
 // How to install:
 //  - Save this file as "QuasiPathfind.js" in your js/plugins/ folder
 //  - Add plugin through the plugin manager
+//  - - Place somewhere below QuasiMovement
 //  - Configure as needed
 //  - Open the Help menu for setup guide or visit one of the following:
 //  - - http://quasixi.com/mv/
@@ -17,17 +18,22 @@
 //============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_PathFind = 1.0;
+Imported.Quasi_PathFind = 1.01;
 
 //=============================================================================
  /*:
- * @plugindesc A Pathfinding plugin for Quasi Movement. ( Non - Optimized)
+ * @plugindesc Quasi Movement Addon: A star Pathfinding plugin. ( Non-Optimized)
  * @author Quasi      Site: http://quasixi.com
  *
  * @param Search Limit
  * @desc Max amount of tiles to search.
  * default: 2000     MV Default: 12
  * @default 2000
+ *
+ * @param Pathfind on Click
+ * @desc Set if the player will pathfind to the clicked location.
+ * default: true
+ * @default true
  *
  * @param Show Console Logs
  * @desc Shows logs about the path finding and time taken.
@@ -36,9 +42,15 @@ Imported.Quasi_PathFind = 1.0;
  *
  * @help
  * =============================================================================
- * **
+ * ** Using Pathfinding
  * =============================================================================
- *
+ * By default, the player will pathfind to the location on the map that you
+ * click on. But you can also move the player or events with a script call.
+ *   Force Pathfind <Script Call>
+ *       $gamePlayer.pathFind(x, y)
+ *           or
+ *       $gameMap.event(ID).pathFind(x, y)
+ *     Set x and y to the location you want to reach, in pixel coordinates.
  * =============================================================================
  * Links
  *  - http://quasixi.com/mv/
@@ -56,6 +68,7 @@ if (!Imported.Quasi_Movement) {
   Pathfind.proccessParameters = function() {
     var parameters   = PluginManager.parameters('QuasiPathfind');
     this.searchLimit = Number(parameters['Search Limit'] || 2);
+    this.moveOnClick = parameters['Pathfind on Click'].toLowerCase() === "true";
     this.showLog     = parameters['Show Console Logs'].toLowerCase() === "true";
   };
   Pathfind.proccessParameters();
@@ -110,6 +123,14 @@ if (!Imported.Quasi_Movement) {
   };
 
   Game_Character.prototype.startPathFind = function(goalX, goalY) {
+    if (Pathfind.moveOnClick) {
+      this.pathFind(goalX, goalY);
+    } else {
+      $gameTemp.clearDestination();
+    }
+  };
+
+  Game_Character.prototype.pathFind = function(goalX, goalY) {
     this._pathFind = null;
     if (!QuasiMovement.offGrid) {
       var ox = goalX % this.moveTiles();
