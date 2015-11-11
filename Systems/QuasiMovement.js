@@ -1,11 +1,15 @@
 //============================================================================
 // Quasi Movement
-// Version: 1.05
-// Last Update: November 8, 2015
+// Version: 1.06
+// Last Update: November 10, 2015
 //============================================================================
 // ** Terms of Use
 // http://quasixi.com/mv/
 // https://github.com/quasixi/RPG-Maker-MV/blob/master/README.md
+//============================================================================
+// Downloading from Github
+//  - Click on Raw next to Blame and History
+//  - Once new page loads, right click and save as
 //============================================================================
 // How to install:
 //  - Save this file as "QuasiMovement.js" in your js/plugins/ folder
@@ -18,7 +22,7 @@
 //============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_Movement = 1.05;
+Imported.Quasi_Movement = 1.06;
 
 //=============================================================================
  /*:
@@ -205,11 +209,11 @@ Imported.Quasi_Movement = 1.05;
  *     inside the quotes! Becareful with the commas ( , ) place them
  *     after } or ] only if it's not the last one in the list!
  *
- *     You can see line 196 doesn't end with a called because it's the last
- *     box in that region. line 199 does end with a comma because there is
- *     another box! But line 200 does not have a comma since it's the last
- *     box. Line 197 ends with a comma because there's another region.
- *     But line 201 does not have a comma because it's the last region.
+ *     You can see line 200 doesn't end with a called because it's the last
+ *     box in that region. line 203 does end with a comma because there is
+ *     another box! But line 204 does not have a comma since it's the last
+ *     box. Line 201 ends with a comma because there's another region.
+ *     But line 205 does not have a comma because it's the last region.
  * =============================================================================
  * ** Setting up Collision Maps
  * =============================================================================
@@ -284,6 +288,40 @@ Imported.Quasi_Movement = 1.05;
  *     x and y default to players x and y
  *     works best when grid is equal to tile size.
  *     the results are logged in the console.
+ *
+ *   Pixel based jump
+ *       $gamePlayer.pixelJump(distanceX, distanceY)
+ *         or
+ *       $gameMap.event(ID).pixelJump(distanceX, distanceY)
+ *
+ *   Jump Forward
+ *       $gamePlayer.jumpForward(direction)
+ *         or
+ *       $gameMap.event(ID).jumpForward(direction)
+ *     Jumps 1 tile size forward
+ *     Direction defaults to the characters direction so it can be left out.
+ *
+ *   Create a collider
+ *       var myBoxCollider = new QuasiMovement.Box_Collider(w, h, ox, oy, shiftY);
+ *         or
+ *       var myCircleCollider = new QuasiMovement.Circle_Collider(w, h, ox, oy, shiftY);
+ *
+ *   Moving a custom collider
+ *       myCollider.moveto(x, y);
+ *     Set X and Y in pixel terms.
+ *     Also use the correct variable that you used to make the collider.
+ *
+ *   Showing Custom collider on map
+ *       SceneManager._scene.addTempCollider(collider, duration)
+ *     (Only works if you're in Scene_Map!)
+ *     Set collider to the collider object
+ *     Set duration to the duration it'll display
+ *
+ *   Get characters that overlap with a collider
+ *       $gameMap.getCharactersAt(collider, ignore)
+ *     Collider needs to be a Collider object
+ *     Ignore is a function
+ *       ( Search this script for an example usage if needed )
  *
  * =Special thanks to Archeia===================================================
  * Links
@@ -380,7 +418,7 @@ var QuasiMovement = (function() {
     var ary = string.split(',');
     ary = ary.map(function(s) {
       s = s.replace(/\s+/g, '');
-      if (/^[0-9]+$/.test(s)) {
+      if (/^-?[0-9]+$/.test(s)) {
         return Number(s || 0);
       }
       return s;
@@ -598,8 +636,8 @@ var QuasiMovement = (function() {
   };
 
   Circle_Collider.prototype.circlePosition = function(radians){
-    var x = this.radiusX * Math.cos(radians);
-    var y = -this.radiusY * Math.sin(radians); // Y axis is flipped
+    var x = (this.radiusX * this.zoomX) * Math.cos(radians);
+    var y = -(this.radiusY * this.zoomY) * Math.sin(radians); // Y axis is flipped
     return [this.center.x + x, this.center.y + y];
   };
 
@@ -619,8 +657,8 @@ var QuasiMovement = (function() {
   Circle_Collider.prototype.containsPoint = function(x, y) {
     var h = this.center.x;
     var k = this.center.y;
-    var xOverRx = Math.pow(x - h, 2) / Math.pow(this.radiusX, 2);
-    var yOverRy = Math.pow(y - k, 2) / Math.pow(this.radiusY, 2);
+    var xOverRx = Math.pow(x - h, 2) / Math.pow((this.radiusX * this.zoomX), 2);
+    var yOverRy = Math.pow(y - k, 2) / Math.pow((this.radiusY * this.zoomY), 2);
     return xOverRx + yOverRy <= 1;
   };
 
@@ -1078,7 +1116,7 @@ var QuasiMovement = (function() {
     return boxes;
   };
 
-  Game_Map.prototype.getCharactersAt = function(box) {
+  Game_Map.prototype.getCharacterGridAt = function(box) {
     var edge = box.gridEdge();
     var x1   = edge[0];
     var x2   = edge[1];
@@ -1097,6 +1135,22 @@ var QuasiMovement = (function() {
             charas.push(this._characterGrid[x][y][i]);
           }
         }
+      }
+    }
+    return charas;
+  };
+
+  Game_Map.prototype.getCharactersAt = function(collider, ignore) {
+    var allCharas = $gameMap.getCharacterGridAt(collider);
+    var charas = [];
+    var i, j;
+    ignore = ignore || function() { return false; };
+    for (i = 0, j = allCharas.length; i < j; i++) {
+      if (ignore(allCharas[i])) {
+        continue;
+      }
+      if (collider.intersects(allCharas[i].collider())) {
+        charas.push(allCharas[i])
       }
     }
     return charas;
@@ -1360,8 +1414,13 @@ var QuasiMovement = (function() {
     var dist = dist || this.moveTiles();
     var x1 = $gameMap.roundPXWithDirection(x, horz, dist);
     var y1 = $gameMap.roundPYWithDirection(y, vert, dist);
-    return (this.canPass(x, y, vert, dist) && this.canPass(x, y1, horz, dist)) &&
-           (this.canPass(x, y, horz, dist) && this.canPass(x1, y, vert, dist))
+    if (this._smartMoveDir) {
+      return (this.canPass(x, y, vert, dist) && this.canPass(x, y1, horz, dist)) ||
+             (this.canPass(x, y, horz, dist) && this.canPass(x1, y, vert, dist));
+    } else {
+      return (this.canPass(x, y, vert, dist) && this.canPass(x, y1, horz, dist)) &&
+             (this.canPass(x, y, horz, dist) && this.canPass(x1, y, vert, dist));
+    }
   };
 
   Game_CharacterBase.prototype.middlePass = function(x, y, dir, dist) {
@@ -1465,7 +1524,7 @@ var QuasiMovement = (function() {
   };
 
   Game_CharacterBase.prototype.collideWithCharacter = function(d) {
-    var charas = $gameMap.getCharactersAt(this.collider(d));
+    var charas = $gameMap.getCharacterGridAt(this.collider(d));
     for (var i = 0; i < charas.length; i++) {
       if (charas[i].isThrough() || charas[i] === this || !charas[i].isNormalPriority()) {
         continue;
@@ -1609,8 +1668,8 @@ var QuasiMovement = (function() {
   var Alias_Game_CharacterBase_updateJump = Game_CharacterBase.prototype.updateJump;
   Game_CharacterBase.prototype.updateJump = function() {
     Alias_Game_CharacterBase_updateJump.call(this);
-    this._px = this._realPX = this._realY * Movement.tileSize;
-    this._py = this._realPY = this._realX * Movement.tileSize;
+    this._px = this._realPX = this._x * Movement.tileSize;
+    this._py = this._realPY = this._y * Movement.tileSize;
     this.moveAllBoxes(this._px, this._py);
   };
 
@@ -1701,6 +1760,17 @@ var QuasiMovement = (function() {
       }
     }
     return pass === 4;
+  };
+
+  Game_CharacterBase.prototype.pixelJump = function(xPlus, yPlus) {
+    return this.jump(xPlus / Movement.tileSize, yPlus / Movement.tileSize);
+  };
+
+  Game_CharacterBase.prototype.jumpForward = function(dir) {
+    dir = dir || this._direction;
+    var x = dir === 6 ? 1 : dir === 4 ? -1 : 0;
+    var y = dir === 2 ? 1 : dir === 8 ? -1 : 0;
+    this.jump(x, y);
   };
 
   Game_CharacterBase.prototype.moveStraight = function(d) {
@@ -2150,22 +2220,6 @@ var QuasiMovement = (function() {
 
   };
 
-  Game_Character.prototype.getCharasAt = function(collider, ignore) {
-    var allCharas = $gameMap.getCharactersAt(collider);
-    var charas = [];
-    var i, j;
-    ignore = ignore || function() { return false; };
-    for (i = 0, j = allCharas.length; i < j; i++) {
-      if (ignore(allCharas[i])) {
-        continue;
-      }
-      if (collider.intersects(allCharas[i].collider())) {
-        charas.push(allCharas[i])
-      }
-    }
-    return charas;
-  };
-
   //-----------------------------------------------------------------------------
   // Game_Player
   //
@@ -2301,7 +2355,7 @@ var QuasiMovement = (function() {
       var collider = this.copyCollider();
       collider.moveto(x, y)
       var self = this;
-      var events = this.getCharasAt(collider, function(e) {
+      var events = $gameMap.getCharactersAt(collider, function(e) {
         return (e === self || e.constructor === Game_Follower || e.constructor === Game_Vehicle);
       });
       if (events.length === 0) {
@@ -2463,7 +2517,7 @@ var QuasiMovement = (function() {
   Game_Player.prototype.airshipHere = function() {
     var airship;
     var collider = this.copyCollider();
-    var airship = this.getCharasAt(collider, function(e) {
+    var airship = $gameMap.getCharactersAt(collider, function(e) {
       if (e.constructor !== Game_Vehicle) {
         return true;
       }
@@ -2480,7 +2534,7 @@ var QuasiMovement = (function() {
     var y2 = $gameMap.roundPYWithDirection(y1, direction, this.moveTiles() + 4);
     var collider = this.copyCollider();
     collider.moveto(x2, y2)
-    var vehicles = this.getCharasAt(collider, function(e) {
+    var vehicles = $gameMap.getCharactersAt(collider, function(e) {
       if (e.constructor !== Game_Vehicle) {
         return true;
       }
@@ -2659,7 +2713,7 @@ var QuasiMovement = (function() {
     var dist = dist || this.moveTiles();
     var x1 = $gameMap.roundPXWithDirection(this._px, d, dist);
     var y1 = $gameMap.roundPYWithDirection(this._py, d, dist);
-    var charas = $gameMap.getCharactersAt(this.collider(d));
+    var charas = $gameMap.getCharacterGridAt(this.collider(d));
     for (var i = 0; i < charas.length; i++) {
       if (charas[i] === this || charas[i] !== preceding ||
           charas[i]._direction === this.reverseDir(this.direction()) ) {
@@ -2670,7 +2724,7 @@ var QuasiMovement = (function() {
       }
     }
     this.collider(d).moveto(x1, y1);
-    charas = $gameMap.getCharactersAt(this.collider(d));
+    charas = $gameMap.getCharacterGridAt(this.collider(d));
     for (var i = 0; i < charas.length; i++) {
       if (charas[i] === this || charas[i] !== preceding ||
           charas[i]._direction === this.reverseDir(this.direction()) ) {
@@ -2846,7 +2900,7 @@ var QuasiMovement = (function() {
         var prevX = this.collider().x;
         var prevY = this.collider().y;
         this.collider().moveto(x, y);
-        var charas = $gameMap.getCharactersAt(this.collider());
+        var charas = $gameMap.getCharacterGridAt(this.collider());
         var player;
         for (var i = 0; i < charas.length; i++) {
           if (charas[i].constructor !== Game_Player) {
@@ -3012,7 +3066,7 @@ var QuasiMovement = (function() {
       temp.sprite.x += collider.ox;
       temp.sprite.y += collider.oy;
     } else {
-      temp.sprite.bitmap.fillRect(collider.ox, collider.oy, collider.width, collider.height, "#ffffff");
+      temp.sprite.bitmap.fillRect(collider.ox, collider.oy, collider.width, collider.height, Movement.collision);
     }
     temp.sprite.opacity = 100;
     temp.sprite.x = collider.x;
