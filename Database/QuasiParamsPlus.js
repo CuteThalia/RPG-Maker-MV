@@ -1,7 +1,7 @@
 //=============================================================================
 // Quasi Params Plus
-// Version: 1.052
-// Last Update: November 8, 2015
+// Version: 1.053
+// Last Update: November 13, 2015
 //=============================================================================
 // ** Terms of Use
 // http://quasixi.com/mv/
@@ -16,7 +16,7 @@
 //=============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_ParamsPlus = 1.052;
+Imported.Quasi_ParamsPlus = 1.053;
 
 //=============================================================================
  /*:
@@ -574,7 +574,11 @@ var QuasiParams = (function() {
   //
   // The game object class for a battle action.
 
+  var Alias_Game_Action_makeDamageValue = Game_Action.prototype.makeDamageValue;
   Game_Action.prototype.makeDamageValue = function(target, critical) {
+    if (Imported.YEP_DamageCore) {
+      return Alias_Game_Action_makeDamageValue.call(this, target, critical);
+    }
     var item = this.item();
     var baseValue = this.evalDamageFormula(target);
     var value = baseValue * this.calcElementRate(target);
@@ -597,6 +601,17 @@ var QuasiParams = (function() {
     value = Math.round(value);
     return value;
   };
+
+  if (Imported.YEP_DamageCore) {
+    Game_Action.prototype.applyPhysicalRate = function(value, baseDamage, target) {
+      value *= target.pdr;
+      return value + target.pdc;
+    };
+    Game_Action.prototype.applyMagicalRate = function(value, baseDamage, target) {
+      value *= target.mdr;
+      return value + target.mdc;
+    };
+  }
 
   var Alias_Game_Action_applyItemUserEffect = Game_Action.prototype.applyItemUserEffect;
   Game_Action.prototype.applyItemUserEffect = function(target) {
