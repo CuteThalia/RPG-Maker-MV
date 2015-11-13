@@ -13,7 +13,7 @@
 //  - Configure as needed
 //  - Open the Help menu for setup guide or visit one of the following:
 //  - - http://quasixi.com/mv/
-//  - - http://forums.rpgmakerweb.com/ - add link when accepted
+//  - - http://forums.rpgmakerweb.com/index.php?/topic/50441-quasi-scroll/
 //============================================================================
 
 var Imported = Imported || {};
@@ -69,7 +69,7 @@ Imported.Quasi_Scroll = 1.0;
  * Links
  *  - http://quasixi.com/mv/
  *  - https://github.com/quasixi/RPG-Maker-MV
- *  - http://forums.rpgmakerweb.com/ - add link when accepted
+ *  - http://forums.rpgmakerweb.com/index.php?/topic/50441-quasi-scroll/
  */
 //=============================================================================
 
