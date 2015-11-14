@@ -1,7 +1,7 @@
 //============================================================================
 // Quasi Depths
-// Version: 0.90
-// Last Update: November 9, 2015
+// Version: 0.91
+// Last Update: November 13, 2015
 //============================================================================
 // ** Terms of Use
 // http://quasixi.com/mv/
@@ -18,7 +18,7 @@
 //============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_Depths = 0.90;
+Imported.Quasi_Depths = 0.91;
 
 //=============================================================================
  /*:
@@ -57,7 +57,7 @@ Imported.Quasi_Depths = 0.90;
  * This script is incomplete. You can still use it to create bridges and zoom
  * Maps. But it doesn't have all the features I intended to add. I will probably
  * not finish this script because I did not like how it uses region maps.
- * In the future I will probably make a Tiled editor version for this so you 
+ * In the future I will probably make a Tiled editor version for this so you
  * can config depths and zooms in that editor.
  * =============================================================================
  * ** Setting up
@@ -402,6 +402,14 @@ if (!Imported.Quasi_Movement) {
   Game_CharacterBase.prototype.frameSpeed = function() {
     var spd = Alias_Game_CharacterBase_frameSpeed.call(this);
     return spd * this._zoomDepth;
+  };
+
+  var Alias_Game_CharacterBase_copyCollider = Game_CharacterBase.prototype.copyCollider;
+  Game_CharacterBase.prototype.copyCollider = function() {
+    var collider = Alias_Game_CharacterBase_copyCollider.call(this);
+    collider.depth = this._depth;
+    collider.scale(this._zoomDepth);
+    return collider;
   };
 
   //-----------------------------------------------------------------------------
