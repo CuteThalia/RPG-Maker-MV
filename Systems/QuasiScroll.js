@@ -149,7 +149,7 @@ Imported.Quasi_Scroll = 1.0;
     if (this._scrollFrames) {
       return Math.abs(this._scrollDistance / this._scrollSpeed);
     }
-    return Alias_Game_Map_scrollDistanceX.call(this);
+    return Alias_Game_Map_scrollDistance.call(this);
   }
 
   Game_Map.prototype.scrollDistanceX = function() {
