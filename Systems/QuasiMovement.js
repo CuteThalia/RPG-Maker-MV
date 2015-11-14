@@ -1,7 +1,7 @@
 //============================================================================
 // Quasi Movement
-// Version: 1.07
-// Last Update: November 11, 2015
+// Version: 1.08
+// Last Update: November 13, 2015
 //============================================================================
 // ** Terms of Use
 // http://quasixi.com/mv/
@@ -22,7 +22,7 @@
 //============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_Movement = 1.07;
+Imported.Quasi_Movement = 1.08;
 
 //=============================================================================
  /*:
@@ -151,8 +151,8 @@ Imported.Quasi_Movement = 1.07;
  * @default false
  *
  * @param Show Boxes
- * @desc Show the Box Colliders during testing.
- * Set to true or false
+ * @desc Show the Box Colliders by default during testing.
+ * Set to true or false      - Toggle on/off with F10 during play test
  * @default true
  *
  * @help
@@ -1045,26 +1045,35 @@ var QuasiMovement = (function() {
     }
   };
 
-  Game_Map.prototype.collisionMapPass = function(collider, dir, level) {
+  Game_Map.prototype.collisionMapPass = function(collider, dir, passableColors) {
     if (!this._collisionmap.isReady()) {
       return false;
     }
     if (collider.isBox()) {
-      return this.collisionMapBoxPass(collider, dir, level);
+      return this.collisionMapBoxPass(collider, dir, passableColors);
     }
     if (collider.isCircle()) {
-      return this.collisionMapCirclePass(collider, dir, level);
+      return this.collisionMapCirclePass(collider, dir, passableColors);
     }
   };
 
-  Game_Map.prototype.collisionMapBoxPass = function(collider, dir, level) {
+  Game_Map.prototype.insidePassableOnly = function(collider, passableColors) {
+    if (!Movement.convert) {
+      passableColors.splice(passableColors.indexOf("#000000"), 1);
+      return this.collisionMapBoxPass(collider, "top", passableColors) &&
+             this.collisionMapBoxPass(collider, "bottom", passableColors);
+    }
+    return true;
+  };
+
+  Game_Map.prototype.collisionMapBoxPass = function(collider, dir, passableColors) {
     var x1 = Math.floor(collider.edges[dir][0].x);
     var x2 = Math.floor(collider.edges[dir][1].x);
     var y1 = Math.floor(collider.edges[dir][0].y);
     var y2 = Math.floor(collider.edges[dir][1].y);
     for (var x = x1; x <= x2; x++) {
       for (var y = y1; y <= y2; y++) {
-        if (this._collisionmap.getColor(x, y) === Movement.collision) {
+        if (!passableColors.contains(this._collisionmap.getColor(x, y))) {
           return false;
         }
       }
@@ -1072,7 +1081,7 @@ var QuasiMovement = (function() {
     return true;
   };
 
-  Game_Map.prototype.collisionMapCirclePass = function(collider, dir, level) {
+  Game_Map.prototype.collisionMapCirclePass = function(collider, dir, passableColors) {
     switch (dir) {
       case "bottom":
         var r1 = Math.PI;
@@ -1097,7 +1106,7 @@ var QuasiMovement = (function() {
     }
     while (r1 <= r2) {
       var pos = collider.circlePosition(r1);
-      if (this._collisionmap.getColor(Math.floor(pos[0]), Math.floor(pos[1])) === Movement.collision) {
+      if (!passableColors.contains(this._collisionmap.getColor(Math.floor(pos[0]), Math.floor(pos[1])))) {
         return false;
       }
       r1 += s;
@@ -1443,12 +1452,12 @@ var QuasiMovement = (function() {
     if (!Movement.convert) {
       var edge = {2: "bottom", 4: "left", 6: "right", 8: "top"};
       if (dir === 5) {
-        if (!$gameMap.collisionMapPass(this.collider(dir), "top") &&
-            !$gameMap.collisionMapPass(this.collider(dir), "top")) {
+        if (!$gameMap.collisionMapPass(this.collider(dir), "top", this.passableColors()) &&
+            !$gameMap.collisionMapPass(this.collider(dir), "top", this.passableColors())) {
           return false;
         }
       } else {
-        if (!$gameMap.collisionMapPass(this.collider(dir), edge[dir])) {
+        if (!$gameMap.collisionMapPass(this.collider(dir), edge[dir], this.passableColors())) {
           return false;
         }
       }
@@ -1479,14 +1488,19 @@ var QuasiMovement = (function() {
     if (!Movement.convert) {
       var edge = {2: "bottom", 4: "left", 6: "right", 8: "top"};
       if (dir === 5) {
-        if (!$gameMap.collisionMapPass(this.collider(dir), "top") &&
-            !$gameMap.collisionMapPass(this.collider(dir), "top")) {
+        if (!$gameMap.collisionMapPass(this.collider(dir), "top", this.passableColors()) &&
+            !$gameMap.collisionMapPass(this.collider(dir), "top", this.passableColors())) {
           return false;
         }
       } else {
-        if (!$gameMap.collisionMapPass(this.collider(dir), edge[dir])) {
+        if (!$gameMap.collisionMapPass(this.collider(dir), edge[dir], this.passableColors())) {
           return false;
         }
+      }
+    }
+    if (this._passabilityLevel === 1 || this._passabilityLevel === 2) {
+      if (!$gameMap.insidePassableOnly(this.collider(), this.passableColors()) && !this.insidePassableOnlyBox(dir)) {
+        return false;
       }
     }
     if (this.collideWithCharacter(dir)) {
@@ -1518,9 +1532,6 @@ var QuasiMovement = (function() {
 
   Game_CharacterBase.prototype.collideWithTileBox = function(d) {
     var boxes = $gameMap.getTileBoxesAt(this.collider(d));
-    if (this._passabilityLevel === 1 || this._passabilityLevel === 2) {
-      return !this.insidePassableOnlyBox(d, boxes);
-    }
     for (var i = 0; i < boxes.length; i++) {
       if (this.passableColors().contains(boxes[i].color)) {
         continue;
@@ -1547,7 +1558,7 @@ var QuasiMovement = (function() {
   };
 
   Game_CharacterBase.prototype.insidePassableOnlyBox = function(d, boxes) {
-    boxes = boxes || $gameMap.getTileBoxesAt(this.collider(d));
+    boxes = $gameMap.getTileBoxesAt(this.collider(d));
     var passboxes = [];
     if (boxes.length === 0) {
       return false;
@@ -1571,7 +1582,7 @@ var QuasiMovement = (function() {
   };
 
   Game_CharacterBase.prototype.passableColors = function() {
-    var colors = ["#ffffff"];
+    var colors = ["#ffffff", "#000000"];
     switch (this._passabilityLevel) {
       case 1:
       case 3:
@@ -2832,7 +2843,7 @@ var QuasiMovement = (function() {
   };
 
   Game_Event.prototype.comments = function() {
-    if (!this.list()) {
+    if (!this.page() || !this.list()) {
       return "";
     }
     var comments = this.list().filter(function(list) {
@@ -2847,30 +2858,30 @@ var QuasiMovement = (function() {
   var Alias_Game_Event_setupPageSettings = Game_Event.prototype.setupPageSettings;
   Game_Event.prototype.setupPageSettings = function() {
     Alias_Game_Event_setupPageSettings.call(this);
-    this.initalPosition();
+    this.initialPosition();
     this.passabilityLevel(true);
     this._collider = null;
   };
 
-  Game_Event.prototype.initalPosition = function() {
-    var ox = this.initalOffset().x;
-    var oy = this.initalOffset().y;
+  Game_Event.prototype.initialPosition = function() {
+    var ox = this.initialOffset().x;
+    var oy = this.initialOffset().y;
     this.setPixelPosition(this._px + ox, this._py + oy);
   };
 
-  Game_Event.prototype.initalOffset = function() {
-    if (!this._initalOffset) {
-      var ox = /<ox=(\d*)>/.exec(this.comments());
-      var oy = /<oy=(\d*)>/.exec(this.comments());
+  Game_Event.prototype.initialOffset = function() {
+    if (!this._initialOffset) {
+      var ox = /<ox=(-?[0-9]*)>/.exec(this.comments());
+      var oy = /<oy=(-?[0-9]*)>/.exec(this.comments());
       if (ox) {
         ox = Number(ox[1] || 0);
       }
       if (oy) {
         oy = Number(oy[1] || 0);
       }
-      this._initalOffset = new Point(ox || 0 , oy || 0);
+      this._initialOffset = new Point(ox || 0 , oy || 0);
     }
-    return this._initalOffset;
+    return this._initialOffset;
   };
 
   Game_Event.prototype.passabilityLevel = function(reset) {
@@ -2940,6 +2951,15 @@ var QuasiMovement = (function() {
     }
   };
 
+  Input.keyMapper[121] = 'F10';
+  var Alias_Scene_Map_updateMain = Scene_Map.prototype.updateMain;
+  Scene_Map.prototype.updateMain = function() {
+    Alias_Scene_Map_updateMain.call(this);
+    if ($gameTemp.isPlaytest() && Input.isTriggered('F10')) {
+      Movement.showBoxes = !Movement.showBoxes;
+    }
+  };
+
   //-----------------------------------------------------------------------------
   // Sprite_Destination
   //
@@ -2962,7 +2982,7 @@ var QuasiMovement = (function() {
   var Alias_Sprite_Character_update = Sprite_Character.prototype.update;
   Sprite_Character.prototype.update = function() {
     Alias_Sprite_Character_update.call(this);
-    if ($gameTemp.isPlaytest() && Movement.showBoxes) {
+    if ($gameTemp.isPlaytest()) {
       this.updateColliders();
     }
   };
@@ -2972,44 +2992,48 @@ var QuasiMovement = (function() {
       return;
     }
     if (this._colliderData !== this._character.collider()) {
-      this._colliderData = this._character.collider();
-      if (this._colliderData.constructor !== Box_Collider &&
-          this._colliderData.constructor !== Circle_Collider) {
-        return;
-      }
-      var w = this._colliderData.width;
-      var h = this._colliderData.height;
-      var ox = this._colliderData.ox;
-      var oy = this._colliderData.oy;
-      if (this._colliderSprite) {
-        this.removeChild(this._colliderSprite);
-      }
-      this._colliderSprite = new Sprite();
-      this._colliderSprite.bitmap = new Bitmap(this.patternWidth(), this.patternHeight());
-      if (this._colliderData.isCircle()) {
-        var radiusX = this._colliderData.radiusX;
-        var radiusY = this._colliderData.radiusY;
-        this._colliderSprite.bitmap.drawEllipse(radiusX, radiusY, radiusX, radiusY, Movement.collision);
-      } else {
-        this._colliderSprite.bitmap.fillRect(0, 0, w, h, Movement.collision);
-      }
-      this._colliderSprite.x += ox;
-      this._colliderSprite.y += oy;
-      this._colliderSprite.x -= this.x - this._character._px;
-      this._colliderSprite.x -= $gameMap.displayX() * 48;
-      this._colliderSprite.y -= this.y - this._character._py + this._character.shiftY();
-      this._colliderSprite.y -= $gameMap.displayY() * 48;
-      this._colliderSprite.opacity = 100;
-      this.addChild(this._colliderSprite);
+      this.createColliders();
     }
     if (!this._colliderSprite) {
       return;
     }
     if (this._character.constructor == Game_Follower){
-      this._colliderSprite.visible = this._character.isVisible();
+      this._colliderSprite.visible = this._character.isVisible() && Movement.showBoxes;
     } else {
-      this._colliderSprite.visible = this.visible;
+      this._colliderSprite.visible = this.visible && Movement.showBoxes;
     }
+  };
+
+  Sprite_Character.prototype.createColliders = function() {
+    this._colliderData = this._character.collider();
+    if (this._colliderData.constructor !== Box_Collider &&
+        this._colliderData.constructor !== Circle_Collider) {
+      return;
+    }
+    var w = this._colliderData.width;
+    var h = this._colliderData.height;
+    var ox = this._colliderData.ox;
+    var oy = this._colliderData.oy;
+    if (this._colliderSprite) {
+      this.removeChild(this._colliderSprite);
+    }
+    this._colliderSprite = new Sprite();
+    this._colliderSprite.bitmap = new Bitmap(this.patternWidth(), this.patternHeight());
+    if (this._colliderData.isCircle()) {
+      var radiusX = this._colliderData.radiusX;
+      var radiusY = this._colliderData.radiusY;
+      this._colliderSprite.bitmap.drawEllipse(radiusX, radiusY, radiusX, radiusY, Movement.collision);
+    } else {
+      this._colliderSprite.bitmap.fillRect(0, 0, w, h, Movement.collision);
+    }
+    this._colliderSprite.x += ox;
+    this._colliderSprite.y += oy;
+    this._colliderSprite.x -= this.x - this._character._px;
+    this._colliderSprite.x -= $gameMap.displayX() * 48;
+    this._colliderSprite.y -= this.y - this._character._py + this._character.shiftY();
+    this._colliderSprite.y -= $gameMap.displayY() * 48;
+    this._colliderSprite.opacity = 100;
+    this.addChild(this._colliderSprite);
   };
 
   //-----------------------------------------------------------------------------
@@ -3020,7 +3044,7 @@ var QuasiMovement = (function() {
   var Alias_Spriteset_Map_createLowerLayer = Spriteset_Map.prototype.createLowerLayer;
   Spriteset_Map.prototype.createLowerLayer = function() {
     Alias_Spriteset_Map_createLowerLayer.call(this);
-    if ($gameTemp.isPlaytest() && Movement.showBoxes) {
+    if ($gameTemp.isPlaytest()) {
       this.createTileBoxes();
       this._tempColliders = [];
     }
@@ -3068,7 +3092,7 @@ var QuasiMovement = (function() {
   var Alias_Spriteset_Map_updateTilemap = Spriteset_Map.prototype.updateTilemap;
   Spriteset_Map.prototype.updateTilemap = function() {
     Alias_Spriteset_Map_updateTilemap.call(this);
-    if ((!Movement.showBoxes && !$gameTemp.isPlaytest()) || !this._collisionmap) {
+    if ((!$gameTemp.isPlaytest()) || !this._collisionmap) {
       return;
     }
     this.updateTileBoxes();
@@ -3085,17 +3109,23 @@ var QuasiMovement = (function() {
       if (this._regionmap.bitmap !== $gameMap._regionmap) {
         this._regionmap.bitmap = $gameMap._regionmap;
       }
-      this._regionmap.origin.x = $gameMap.displayX() * $gameMap.tileWidth();
-      this._regionmap.origin.y = $gameMap.displayY() * $gameMap.tileHeight();
+      this._regionmap.visible = Movement.showBoxes;
+      if (Movement.showBoxes) {
+        this._regionmap.origin.x = $gameMap.displayX() * $gameMap.tileWidth();
+        this._regionmap.origin.y = $gameMap.displayY() * $gameMap.tileHeight();
+      }
     }
-    this._collisionmap.origin.x = $gameMap.displayX() * $gameMap.tileWidth();
-    this._collisionmap.origin.y = $gameMap.displayY() * $gameMap.tileHeight();
+    this._collisionmap.visible = Movement.showBoxes;
+    if (Movement.showBoxes) {
+      this._collisionmap.origin.x = $gameMap.displayX() * $gameMap.tileWidth();
+      this._collisionmap.origin.y = $gameMap.displayY() * $gameMap.tileHeight();
+    }
   };
 
   Spriteset_Map.prototype.updateTempColliders = function() {
     var remove = [];
     for (var i = 0; i < this._tempColliders.length; i++) {
-      if (this._tempColliders[i].decay <= 0) {
+      if (this._tempColliders[i].decay <= 0 || !this._tempCollider[i].collider) {
         this.removeChild(this._tempColliders[i].sprite);
         remove.push(i);
       }
