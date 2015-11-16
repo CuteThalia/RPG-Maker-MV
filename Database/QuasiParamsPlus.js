@@ -16,7 +16,7 @@
 //=============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_ParamsPlus = 1.054;
+Imported.Quasi_ParamsPlus = 1.055;
 
 //=============================================================================
  /*:
@@ -99,6 +99,13 @@ Imported.Quasi_ParamsPlus = 1.054;
  *     the order the custom param was made. So in my example since param qpp
  *     was made first that would have an id of 0, while qpt has an id of 1.
  *     * Value can be a negative number.
+ *
+ *   To Set a custom Parameter use <Script Call>
+ *       $gameParty.members()[MEMBER ID].setCParam(CParamId, value)
+ *     * CParamId is the id of the custom parameter. which is based on
+ *     the order the custom param was made. So in my example since param qpp
+ *     was made first that would have an id of 0, while qpt has an id of 1.
+ *     * Value is the number you want to set the parameter too.
  *
  *   These new functions can be used to get data from the new custom parameters
  *       QuasiParams.customAbr(ID)
@@ -496,6 +503,11 @@ var QuasiParams = (function() {
       this._cParamPlus[paramId] = 0;
     }
     this._cParamPlus[paramId] += value;
+    this.refresh();
+  };
+
+  Game_BattlerBase.prototype.setCParam = function(paramId, value) {
+    this._cParamPlus[paramId] = value;
     this.refresh();
   };
 
