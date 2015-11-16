@@ -1,7 +1,7 @@
 //=============================================================================
 // Quasi Params Plus
-// Version: 1.053
-// Last Update: November 13, 2015
+// Version: 1.054
+// Last Update: November 16, 2015
 //=============================================================================
 // ** Terms of Use
 // http://quasixi.com/mv/
@@ -16,7 +16,7 @@
 //=============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_ParamsPlus = 1.053;
+Imported.Quasi_ParamsPlus = 1.054;
 
 //=============================================================================
  /*:
@@ -179,23 +179,23 @@ var QuasiParams = (function() {
   Params.equips = [];
   Params.equips[0] = {}; // weapons
   Params.equips[1] = {}; // armors
-  Params.equipParamsPlus = function(equipId, isWeapon) {
-    if (isWeapon) {
+  Params.equipParamsPlus = function(equip) {
+    if (!equip.atypeId) {
       var data = this.equips[0];
-      var note = $dataWeapons[equipId].note;
     } else {
       var data = this.equips[1];
-      var note = $dataArmors[equipId].note;
     }
-    if (!data[equipId]) {
+    var id = equip.baseItemId || equip.id;
+    if (!data[id]) {
+      var note   = equip.note;
       var params = /<params>([\s\S]*)<\/params>/i.exec(note);
       if (params) {
-        data[equipId] = this.stringToObjAry(params[1]);
+        data[id] = this.stringToObjAry(params[1]);
       } else {
-        data[equipId] = 0;
+        data[id] = data[id] || {};
       }
     }
-    return data[equipId];
+    return data[id];
   };
 
   Params.charas = [];
@@ -297,7 +297,7 @@ var QuasiParams = (function() {
       var s = /^(.*):(.*)/.exec(e);
       if (s) {
         var id = Params.public.id[s[1].toLowerCase()];
-        if (id === undefined) {
+        if (typeof id === 'undefined') {
           var p = s[1].toLowerCase();
           for (var i = 0; i < Params.custom.length; i++) {
             if (Params.custom[i]["abr"] === p) {
@@ -546,7 +546,7 @@ var QuasiParams = (function() {
     var equips = this.equips();
     equips.forEach(function(equip) {
       if (equip) {
-        var params = Params.equipParamsPlus(equip.id, DataManager.isWeapon(equip));
+        var params = Params.equipParamsPlus(equip);
         if (params[paramId]) {
           var v = $gameVariables._data;
           var a = this;
@@ -574,34 +574,6 @@ var QuasiParams = (function() {
   //
   // The game object class for a battle action.
 
-  var Alias_Game_Action_makeDamageValue = Game_Action.prototype.makeDamageValue;
-  Game_Action.prototype.makeDamageValue = function(target, critical) {
-    if (Imported.YEP_DamageCore) {
-      return Alias_Game_Action_makeDamageValue.call(this, target, critical);
-    }
-    var item = this.item();
-    var baseValue = this.evalDamageFormula(target);
-    var value = baseValue * this.calcElementRate(target);
-    if (this.isPhysical()) {
-      value *= target.pdr;
-      value += target.pdc;
-    }
-    if (this.isMagical()) {
-      value *= target.mdr;
-      value += target.mdc;
-    }
-    if (baseValue < 0) {
-      value *= target.rec;
-    }
-    if (critical) {
-      value = this.applyCritical(value);
-    }
-    value = this.applyVariance(value, item.damage.variance);
-    value = this.applyGuard(value, target);
-    value = Math.round(value);
-    return value;
-  };
-
   if (Imported.YEP_DamageCore) {
     Game_Action.prototype.applyPhysicalRate = function(value, baseDamage, target) {
       value *= target.pdr;
@@ -610,6 +582,34 @@ var QuasiParams = (function() {
     Game_Action.prototype.applyMagicalRate = function(value, baseDamage, target) {
       value *= target.mdr;
       return value + target.mdc;
+    };
+  } else {
+    var Alias_Game_Action_makeDamageValue = Game_Action.prototype.makeDamageValue;
+    Game_Action.prototype.makeDamageValue = function(target, critical) {
+      if (Imported.YEP_DamageCore) {
+        return Alias_Game_Action_makeDamageValue.call(this, target, critical);
+      }
+      var item = this.item();
+      var baseValue = this.evalDamageFormula(target);
+      var value = baseValue * this.calcElementRate(target);
+      if (this.isPhysical()) {
+        value *= target.pdr;
+        value += target.pdc;
+      }
+      if (this.isMagical()) {
+        value *= target.mdr;
+        value += target.mdc;
+      }
+      if (baseValue < 0) {
+        value *= target.rec;
+      }
+      if (critical) {
+        value = this.applyCritical(value);
+      }
+      value = this.applyVariance(value, item.damage.variance);
+      value = this.applyGuard(value, target);
+      value = Math.round(value);
+      return value;
     };
   }
 
