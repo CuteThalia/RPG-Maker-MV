@@ -1,7 +1,7 @@
 //============================================================================
 // Quasi Depths
-// Version: 0.91
-// Last Update: November 13, 2015
+// Version: 0.92
+// Last Update: November 16, 2015
 //============================================================================
 // ** Terms of Use
 // http://quasixi.com/mv/
@@ -18,7 +18,7 @@
 //============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_Depths = 0.91;
+Imported.Quasi_Depths = 0.92;
 
 //=============================================================================
  /*:
@@ -410,6 +410,25 @@ if (!Imported.Quasi_Movement) {
     collider.depth = this._depth;
     collider.scale(this._zoomDepth);
     return collider;
+  };
+
+  //-----------------------------------------------------------------------------
+  // Game_Character
+  //
+  // The superclass of Game_Player, Game_Follower, GameVehicle, and Game_Event.
+
+  var Alias_Game_Character_subMove = Game_Character.prototype.subMove;
+  Game_Character.prototype.subMmove = function(settings) {
+    settings = QuasiMovement.stringToAry(settings);
+    settings[1] *= this._zoomDepth;
+    Alias_Game_Character_subMmove.call(this, settings.toString());
+  }
+
+  var Alias_Game_Character_subQmove = Game_Character.prototype.subQmove;
+  Game_Character.prototype.subQmove = function(settings) {
+    settings = QuasiMovement.stringToAry(settings);
+    settings[1] *= this._zoomDepth;
+    Alias_Game_Character_subQmove.call(this, settings.toString());
   };
 
   //-----------------------------------------------------------------------------
