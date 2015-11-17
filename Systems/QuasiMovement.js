@@ -1,7 +1,7 @@
 //============================================================================
 // Quasi Movement
-// Version: 1.08
-// Last Update: November 13, 2015
+// Version: 1.09
+// Last Update: November 16, 2015
 //============================================================================
 // ** Terms of Use
 // http://quasixi.com/mv/
@@ -22,7 +22,7 @@
 //============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_Movement = 1.08;
+Imported.Quasi_Movement = 1.09;
 
 //=============================================================================
  /*:
@@ -197,7 +197,7 @@ Imported.Quasi_Movement = 1.08;
  *   JSON template <JSON>
  *       {
  *         "REGION ID 1": [
- *                     {"width": w, "height": h, "ox": ox value, "oy": oy value}
+ *                     {"width": w, "height": h, "ox": ox value, "oy": oy value, "tag": "some text"}
  *                        ],
  *         "REGION ID 2": [
  *                     {"width": w, "height": h, "ox": value, "oy": value},
@@ -214,6 +214,17 @@ Imported.Quasi_Movement = 1.08;
  *     another box! But line 204 does not have a comma since it's the last
  *     box. Line 201 ends with a comma because there's another region.
  *     But line 205 does not have a comma because it's the last region.
+ *
+ *     The tag field will act like notetags for regions. This will allow me to
+ *     treat regions differently depending on the tag if needed.
+ *
+ *     Few tags:
+ *         <counter>
+ *         <bush>
+ *         <ladder>
+ *         <damage>
+ *     * You can use more then one tag, just keep it inside the "" quotes!
+ *       Ex:  "<bush><damage>"
  * =============================================================================
  * ** Setting up Collision Maps
  * =============================================================================
@@ -496,6 +507,10 @@ var QuasiMovement = (function() {
     return false;
   };
 
+  Box_Collider.prototype.isPolygon = function() {
+    return false;
+  };
+
   Box_Collider.prototype.isBox = function() {
     return true;
   };
@@ -561,6 +576,9 @@ var QuasiMovement = (function() {
   };
 
   Box_Collider.prototype.intersects = function(other) {
+    if (this.height === 0 || this.width === 0) {
+      return false;
+    }
     if (other.isCircle()) {
       return this.intersectsWithCircle(other);
     }
@@ -578,7 +596,9 @@ var QuasiMovement = (function() {
     return insideX && insideY;
   };
 
-  Box_Collider.prototype.intersectsWithCircle = function(circle) {
+  Box_Collider.prototype.oldintersectsWithCircle = function(circle) {
+    // This should be more accurate but new one shows better results
+    // Keeping this method incase I need to revert.
     if (this.containsPoint(circle.center.x, circle.center.y)) {
       return true;
     }
@@ -591,24 +611,68 @@ var QuasiMovement = (function() {
     return this.containsPoint(pos[0], pos[1]);
   };
 
-  Box_Collider.prototype.inside = function(other) {
-    var otherVertices = other._vertices;
-    var x2min = otherVertices[0].x;
-    var x2max = otherVertices[1].x;
-    var y2min = otherVertices[0].y;
-    var y2max = otherVertices[2].y;
-    var pass = 0;
-    for (var i = 0; i < this._vertices.length; i++) {
-      var insideX = (this._vertices[i].x <= x2max) && (this._vertices[i].x >= x2min);
-      var insideY = (this._vertices[i].y <= y2max) && (this._vertices[i].y >= y2min);
-      if (insideX && insideY) {
-        pass++;
+  Box_Collider.prototype.intersectsWithCircle = function(circle) {
+    if (this.height === 0 || this.width === 0) {
+      return false;
+    }
+    var i, j;
+    for (i = 0, j = this._vertices.length; i < j; i++) {
+      if (circle.containsPoint(this._vertices[i].x , this._vertices[i].y)) {
+        return true;
       }
     }
-    return pass === 4;
+    for (i = 0, j = circle._circleVertices.length; i < j; i++) {
+      if (this.containsPoint(circle._circleVertices[i].x , circle._circleVertices[i].y)) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  Box_Collider.prototype.inside = function(other) {
+    if (this.height === 0 || this.width === 0) {
+      return false;
+    }
+    if (other.isCircle()) {
+      var vertices = other._circleVertices;
+    } else {
+      var vertices = other._vertices;
+    }
+    var i, j;
+    for (i = 0, j = vertices.length; i < j; i++) {
+      if (!this.containsPoint(vertices[i].x, vertices[i].y)) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  Box_Collider.prototype.halfInside = function(other) {
+    if (this.height === 0 || this.width === 0) {
+      return false;
+    }
+    if (other.isCircle()) {
+      var vertices = other._circleVertices;
+    } else {
+      var vertices = other._vertices;
+    }
+    var pass = 0;
+    var i, j;
+    for (i = 0, j = vertices.length; i < j; i++) {
+      if (!this.containsPoint(vertices[i].x, vertices[i].y)) {
+        pass++;
+        if (pass >= j / 2) {
+          return false;
+        }
+      }
+    }
+    return true;
   };
 
   Box_Collider.prototype.containsPoint = function(x, y) {
+    if (this.height === 0 || this.width === 0) {
+      return false;
+    }
     var x1min = this._vertices[0].x;
     var x1max = this._vertices[1].x;
     var y1min = this._vertices[0].y;
@@ -616,6 +680,13 @@ var QuasiMovement = (function() {
     var insideX = (x1min <= x) && (x1max >= x);
     var insideY = (y1min <= y) && (y1max >= y);
     return insideX && insideY;
+  };
+
+  Box_Collider.prototype.equals = function(other) {
+    return (this.constructor === other.constructor &&
+      this.width === other.width && this.height === other.height &&
+      this.x === other.x && this.y === other.y &&
+      this.ox === other.ox && this.oy === other.oy);
   };
 
   Movement.Box_Collider = Box_Collider;
@@ -632,9 +703,27 @@ var QuasiMovement = (function() {
   Circle_Collider.prototype.constructor = Circle_Collider;
 
   Circle_Collider.prototype.initialize = function(w, h, ox, oy, shift_y) {
-    Box_Collider.prototype.initialize.call(this, w, h, ox, oy, shift_y);
     this.radiusX  = w / 2;
     this.radiusY  = h / 2;
+    Box_Collider.prototype.initialize.call(this, w, h, ox, oy, shift_y);
+  };
+
+  Circle_Collider.prototype.vertices = function(reset) {
+    this._vertices = Box_Collider.prototype.vertices.call(this, reset);
+    if (reset || !this._circleVertices){
+      var rx = this.radiusX * this.zoomX;
+      var ry = this.radiusY * this.zoomY;
+      var top    = new Point(this._vertices[0].x + rx, this._vertices[0].y);
+      var left   = new Point(this._vertices[0].x, this._vertices[0].y + ry);
+      var right  = new Point(this._vertices[0].x + 2 * rx, this._vertices[0].y + ry);
+      var bottom = new Point(this._vertices[0].x + rx, this._vertices[0].y + 2 * ry);
+      var topLeft     = new Point(this._vertices[0].x + rx / 2, this._vertices[0].y + ry / 2);
+      var topRight    = new Point(this._vertices[1].x - rx / 2, this._vertices[1].y + ry / 2);
+      var bottomLeft  = new Point(this._vertices[2].x + rx / 2, this._vertices[3].y - ry / 2);
+      var bottomRight = new Point(this._vertices[3].x - rx / 2, this._vertices[3].y - ry / 2);
+      this._circleVertices = [top, left, right, bottom, topLeft, topRight, bottomLeft, bottomRight];
+    }
+    return this._vertices;
   };
 
   Circle_Collider.prototype.isCircle = function() {
@@ -675,6 +764,125 @@ var QuasiMovement = (function() {
   Movement.Circle_Collider = Circle_Collider;
 
   //-----------------------------------------------------------------------------
+  // Polygon_Collider
+  //
+  // This class handles Polygon Colliders for characters.
+
+  function Polygon_Collider() {
+      this.initialize.apply(this, arguments);
+  };
+  Polygon_Collider.prototype = Object.create(Box_Collider.prototype);
+  Polygon_Collider.prototype.constructor = Polygon_Collider;
+
+  Polygon_Collider.prototype.initialize = function(vertices) {
+    this.polyVertices = [];
+    this.baseVertices = [];
+    for (var i = 0; i < vertices.length; i++) {
+      this.polyVertices.push(new Point(vertices[i].x, vertices[i].y));
+      this.baseVertices.push(new Point(vertices[i].x, vertices[i].y));
+    }
+    vertices.sort(function(a, b) {
+      return a.x - b.x;
+    });
+    var xMin = vertices[0].x;
+    var xMax = vertices[vertices.length - 1].x;
+    vertices.sort(function(a, b) {
+      return a.y- b.y;
+    });
+    var yMin = vertices[0].y;
+    var yMax = vertices[vertices.length - 1].y;
+    var w = Math.abs(xMax - xMin);
+    var h = Math.abs(yMax - yMin);
+    var ox = Math.min(xMin, 0, xMax);
+    var oy = Math.min(yMin, 0, yMax);
+    Box_Collider.prototype.initialize.call(this, w, h, ox, oy);
+  };
+
+  Polygon_Collider.prototype.reshape = function(points) {
+    this.initialize(points);
+  };
+
+  Polygon_Collider.prototype.isPolygon = function() {
+    return true;
+  };
+
+  Polygon_Collider.prototype.isBox = function() {
+    return false;
+  };
+
+  Polygon_Collider.prototype.scale = function(zX, zY) {
+    return;
+  };
+
+  Polygon_Collider.prototype.vertices = function(reset) {
+    if (reset){
+      var i, j;
+      for (i = 0, j = this.polyVertices.length; i < j; i++) {
+        this.polyVertices[i].x = this.x + this.baseVertices[i].x;
+        this.polyVertices[i].y = this.y + this.baseVertices[i].y;
+      }
+    }
+    return Box_Collider.prototype.vertices.call(this, reset);
+  };
+
+  Polygon_Collider.prototype.intersects = function(other) {
+    if (other.isCircle()) {
+      return this.intersectsWithCircle(other);
+    }
+    if (other.isBox()) {
+      return this.intersectsWithBox(other);
+    }
+    // Not a real polygon intersection check!
+    // There should not be any polygon - polygon intersections anyways
+    var i, j;
+    for (i = 0, j = other.polyVertices.length; i < j; i++) {
+      if (this.containsPoint(other.polyVertices[i].x, other.polyVertices[i].y)) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  Polygon_Collider.prototype.intersectsWithCircle = function(other) {
+    // Not accurate but good enough for what I use it for
+    var i, j;
+    for (i = 0, j = other._circleVertices.length; i < j; i++) {
+      if (this.containsPoint(other._circleVertices[i].x, other._circleVertices[i].y)) {
+        return true;
+      }
+    }
+    return false
+  };
+
+  Polygon_Collider.prototype.intersectsWithBox = function(other) {
+    var i, j;
+    for (i = 0, j = other._vertices.length; i < j; i++) {
+      if (this.containsPoint(other._vertices[i].x, other._vertices[i].y)) {
+        return true;
+      }
+    }
+    return false
+  };
+
+  Polygon_Collider.prototype.containsPoint = function(x, y) {
+    var i;
+    var j = this.polyVertices.length - 1;
+    var odd = false;
+    var poly = this.polyVertices;
+    for (i = 0; i < this.polyVertices.length; i++) {
+      if (poly[i].y < y && poly[j].y >= y || poly[j].y < y && poly[i].y >= y) {
+        if (poly[i].x + (y - poly[i].y) / (poly[j].y - poly[i].y) * (poly[j].x - poly[i].x) < x) {
+          odd = !odd;
+        }
+      }
+      j = i;
+    }
+    return odd;
+  };
+
+  Movement.Polygon_Collider = Polygon_Collider;
+
+  //-----------------------------------------------------------------------------
   // Game_Temp
   //
   // The game object class for temporary data that is not included in save data.
@@ -687,8 +895,8 @@ var QuasiMovement = (function() {
   };
 
   Game_Temp.prototype.setPixelDestination = function(x, y) {
-    this._destinationPX = x;
-    this._destinationPY = y;
+    this._destinationPX = x - $gameMap.tileWidth() / 2;
+    this._destinationPY = y - $gameMap.tileHeight() / 2;
     var x1 = $gameMap.roundX(Math.floor(x / $gameMap.tileWidth()));
     var y1 = $gameMap.roundY(Math.floor(y / $gameMap.tileHeight()));
     this.setDestination(x1, y1);
@@ -819,6 +1027,7 @@ var QuasiMovement = (function() {
         data[1] = regionData[i]["height"] || 0;
         data[2] = regionData[i]["ox"] || 0;
         data[3] = regionData[i]["oy"] || 0;
+        data[4] = regionData[i]["tag"] || "";
         boxData[i] = data;
       }
       flag = 0;
@@ -854,11 +1063,12 @@ var QuasiMovement = (function() {
     var h  = boxData[1];
     var newBox = new Box_Collider(w, h, ox, oy);
     newBox.moveto(x1, y1);
+    newBox.note      = boxData[4] || "";
     newBox.flag      = flag;
-    newBox.isLadder  = flag & 0x20;
-    newBox.isBush    = flag & 0x40;
-    newBox.isCounter = flag & 0x80;
-    newBox.isDamage  = flag & 0x100;
+    newBox.isLadder  = (flag & 0x20)  || /<ladder>/i.test(newBox.note);
+    newBox.isBush    = (flag & 0x40)  || /<bush>/i.test(newBox.note);
+    newBox.isCounter = (flag & 0x80)  || /<counter>/i.test(newBox.note);
+    newBox.isDamage  = (flag & 0x100) || /<damage>/i.test(newBox.note);
     if (flag === 2575) {
       newBox.color = Movement.water2;
     } else if (flag === 2063) {
@@ -1405,6 +1615,7 @@ var QuasiMovement = (function() {
     var x1 = $gameMap.roundPXWithDirection(x, dir, dist);
     var y1 = $gameMap.roundPYWithDirection(y, dir, dist);
     if (!this.collisionCheck(x1, y1, dir, dist)) {
+      this.collider(dir).moveto(x, y);
       return false;
     }
     if ($gameMap.isLoopHorizontal() || $gameMap.isLoopVertical()) {
@@ -1421,6 +1632,7 @@ var QuasiMovement = (function() {
         y1 = y2 < 0 ? y1 + h : (y3 >= $gameMap.height() - 1 ? y1 - h : y1);
         this.collider(dir).moveto(x1, y1);
         if (!this.collisionCheck(x1, y1, dir, dist)) {
+          this.collider(dir).moveto(x, y);
           return false;
         }
       }
@@ -2048,7 +2260,7 @@ var QuasiMovement = (function() {
       }
     }
     Alias_Game_Character_processMoveCommand.call(this, command);
-  }
+  };
 
   Game_Character.prototype.subMmove = function(settings) {
     var move = {
@@ -2113,21 +2325,8 @@ var QuasiMovement = (function() {
     return $gameMap.distance(this.cx(), this.cy(), x, y);
   };
 
-  Game_Character.prototype.pixelDistanceFromWithBox = function(box1, box2) {
-    var cx1 = box1.center.x;
-    var cx2 = box2.center.x;
-    var cy1 = box1.center.y;
-    var cy2 = box2.center.y;
-    if (box1.intersects(box2)) {
-      return [$gameMap.deltaPX(cx1, cx2), $gameMap.deltaPY(cy1, cy2)];
-    }
-    var horz = cx1 > cx2 ? -1 : cx1 < cx2 ? 1 : 0;
-    var vert = cy1 > cy2 ? -1 : cy1 < cy2 ? 1 : 0;
-    var x1 = cx1 + (box1.width * horz / 2);
-    var x2 = cx2 + (box2.width * -horz / 2);
-    var y1 = cy1 + (box1.height * vert / 2);
-    var y2 = cy2 + (box2.height * -vert / 2);
-    return [$gameMap.deltaPX(x1, x2), $gameMap.deltaPY(y1, y2)];
+  Game_Character.prototype.pixelDistanceFromWithBox = function(other) {
+    // to do or not, not really needed
   };
 
   Game_Character.prototype.moveRandom = function() {
@@ -2138,12 +2337,12 @@ var QuasiMovement = (function() {
   };
 
   Game_Character.prototype.moveTowardCharacter = function(character) {
-    var sx = this.deltaPXFrom(character.cx());
-    var sy = this.deltaPYFrom(character.cy());
-
+    var sx = this.cx() - character.cx();
+    var sy = this.cy() - character.cy();
     if (sx != 0 && sy != 0 && Movement.diagonal) {
       this.moveDiagonally(sx > 0 ? 4 : 6, sy > 0 ? 8 : 2);
-    } else if (Math.abs(sx) > Math.abs(sy)) {
+    }
+    if (Math.abs(sx) > Math.abs(sy)) {
       this.moveStraight(sx > 0 ? 4 : 6);
       if (!this.isMovementSucceeded() && sy !== 0) {
         this.moveStraight(sy > 0 ? 8 : 2);
@@ -2861,6 +3060,7 @@ var QuasiMovement = (function() {
     this.initialPosition();
     this.passabilityLevel(true);
     this._collider = null;
+    this._randomDir = null;
   };
 
   Game_Event.prototype.initialPosition = function() {
@@ -2919,6 +3119,16 @@ var QuasiMovement = (function() {
     }
   };
 
+  Game_Event.prototype.moveTypeRandom = function() {
+    if (this._freqCount === 0 || !this._randomDir) {
+      this._randomDir = 2 * (Math.randomInt(4) + 1);
+    }
+    if (!this.canPass(this._px, this._py, this._randomDir)) {
+      this._randomDir = 2 * (Math.randomInt(4) + 1);
+    }
+    this.moveStraight(this._randomDir);
+  };
+
   //-----------------------------------------------------------------------------
   // Scene_Map
   //
@@ -2945,9 +3155,9 @@ var QuasiMovement = (function() {
     }
   };
 
-  Scene_Map.prototype.addTempCollider = function(collider, duration) {
+  Scene_Map.prototype.addTempCollider = function(collider, duration, remove) {
     if ($gameTemp.isPlaytest() && Movement.showBoxes) {
-      this._spriteset.addTempCollider(collider, duration || 60);
+      this._spriteset.addTempCollider(collider, duration || 60, remove);
     }
   };
 
@@ -3018,7 +3228,7 @@ var QuasiMovement = (function() {
       this.removeChild(this._colliderSprite);
     }
     this._colliderSprite = new Sprite();
-    this._colliderSprite.bitmap = new Bitmap(this.patternWidth(), this.patternHeight());
+    this._colliderSprite.bitmap = new Bitmap(w + ox, h + oy);
     if (this._colliderData.isCircle()) {
       var radiusX = this._colliderData.radiusX;
       var radiusY = this._colliderData.radiusY;
@@ -3065,28 +3275,49 @@ var QuasiMovement = (function() {
     }
   };
 
-  Spriteset_Map.prototype.addTempCollider = function(collider, duration) {
+  Spriteset_Map.prototype.addTempCollider = function(collider, duration, remove) {
+    var i, j;
     var temp = {};
+    for (i = 0, j = this._tempColliders.length; i < j; i++) {
+      if (this._tempColliders[i].collider === collider) {
+        if (remove) {
+          var replace = true;
+          temp = this._tempColliders[i];
+          break;
+        }
+      }
+      if (this._tempColliders[i].collider.equals(collider)) {
+        this._tempColliders[i].decay = duration;
+        return;
+      }
+    }
     temp.collider = collider;
     temp.decay = duration;
-    temp.sprite = new Sprite();
+    if (!replace) {
+      temp.sprite = new Sprite();
+    }
     temp.sprite.bitmap = new Bitmap(collider.width + collider.ox, collider.height + collider.oy);
     if (collider.isCircle()) {
       var radiusX = collider.radiusX;
       var radiusY = collider.radiusY;
       temp.sprite.bitmap.drawEllipse(radiusX, radiusY, radiusX, radiusY, Movement.collision);
-      temp.sprite.x += collider.ox;
-      temp.sprite.y += collider.oy;
+    } else if (collider.isPolygon()) {
+      temp.sprite.bitmap = new Bitmap(collider.width, collider.height);
+      temp.sprite.bitmap.drawPolygon(collider.baseVertices, -collider.ox, -collider.oy, Movement.collision);
+      temp.sprite._offset.x = collider.ox;
+      temp.sprite._offset.y = collider.oy;
     } else {
       temp.sprite.bitmap.fillRect(collider.ox, collider.oy, collider.width, collider.height, Movement.collision);
     }
     temp.sprite.opacity = 100;
-    temp.sprite.x = collider.x;
+    temp.sprite.x += collider.x;
     temp.sprite.x -= $gameMap.displayX() * 48;
-    temp.sprite.y = collider.y;
+    temp.sprite.y += collider.y;
     temp.sprite.y -= $gameMap.displayY() * 48;
-    this._tempColliders.push(temp);
-    this.addChild(temp.sprite);
+    if (!replace) {
+      this._tempColliders.push(temp);
+      this.addChild(temp.sprite);
+    }
   };
 
   var Alias_Spriteset_Map_updateTilemap = Spriteset_Map.prototype.updateTilemap;
@@ -3125,13 +3356,16 @@ var QuasiMovement = (function() {
   Spriteset_Map.prototype.updateTempColliders = function() {
     var remove = [];
     for (var i = 0; i < this._tempColliders.length; i++) {
-      if (this._tempColliders[i].decay <= 0 || !this._tempCollider[i].collider) {
+      if (this._tempColliders[i].decay <= 0 || !this._tempColliders[i].collider) {
         this.removeChild(this._tempColliders[i].sprite);
         remove.push(i);
       }
       this._tempColliders[i].decay--;
       this._tempColliders[i].sprite.x = this._tempColliders[i].collider.x;
+      this._tempColliders[i].sprite.x -= $gameMap.displayX() * 48;
       this._tempColliders[i].sprite.y = this._tempColliders[i].collider.y;
+      this._tempColliders[i].sprite.y -= $gameMap.displayY() * 48;
+      this._tempColliders[i].sprite.visible = Movement.showBoxes;
     }
     for (var i = 0; i < remove.length; i++) {
       this._tempColliders.splice(remove[i], 1);
@@ -3177,16 +3411,32 @@ var QuasiMovement = (function() {
   };
 
   Bitmap.prototype.drawEllipse = function(x, y, radiusX, radiusY, color) {
-      var context = this._context;
-      context.save();
-      context.fillStyle = color;
-      context.beginPath();
-      context.scale(radiusX, radiusY);
-      context.arc(1, 1, 1, 0, Math.PI * 2, false);
-      context.translate(x, y);
-      context.fill();
-      context.restore();
-      this._setDirty();
+    var context = this._context;
+    context.save();
+    context.fillStyle = color;
+    context.beginPath();
+    context.scale(radiusX, radiusY);
+    context.arc(1, 1, 1, 0, Math.PI * 2, false);
+    context.translate(x, y);
+    context.fill();
+    context.restore();
+    this._setDirty();
   };
+
+  Bitmap.prototype.drawPolygon = function(points, shiftX, shiftY, color) {
+    var context = this._context;
+    context.save();
+    context.fillStyle = color;
+    context.moveTo(points[0].x + shiftX, points[0].y + shiftY);
+    var i, j;
+    for (i = 0, j = points.length; i < j; i++) {
+      context.lineTo(points[i].x + shiftX, points[i].y + shiftY);
+    }
+    context.closePath();
+    context.fill();
+    context.restore();
+    this._setDirty();
+  };
+
   return Movement;
 })();
