@@ -50,7 +50,7 @@ Imported.Quasi_EZJSON = 1.0;
  *  - https://github.com/quasixi/RPG-Maker-MV
  *  - http://forums.rpgmakerweb.com/index.php?/user/25663-quasi/
  *  - http://forums.rpgmakerweb.com/index.php?/topic/48741-quasi-movement/
- *  -
+ *  - http://forums.rpgmakerweb.com/index.php?/topic/48777-quasi-params-plus/
  */
 //=============================================================================
 
