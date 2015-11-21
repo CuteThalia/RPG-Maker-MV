@@ -1,6 +1,6 @@
 //============================================================================
 // Quasi EZ JSON
-// Version: 1.0
+// Version: 1.01
 // Last Update: November 20, 2015
 //============================================================================
 // ** Terms of Use
@@ -25,7 +25,7 @@
 //============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_EZJSON = 1.0;
+Imported.Quasi_EZJSON = 1.01;
 
 //=============================================================================
  /*:
@@ -36,6 +36,8 @@ Imported.Quasi_EZJSON = 1.0;
  * To use, simply turn on this plugin and start the game. And you will start
  * with the editor instead of title screen.
  * Turn off plugin when you do not want to start with editor.
+ *
+ * To delete / remove a setting, just hover over it and push backspace.
  *
  * If help needed pm me on RPGMaker Web.
  *
@@ -64,11 +66,6 @@ if (!Imported.Quasi_Input) {
 
   QuasiJSON.setup = function() {
     this.fs = require('fs');
-    this._path = window.location.pathname.replace(/(\/www|)\/[^\/]*$/, "/" + QuasiMovement.jFolder);
-    if (this._path.match(/^\/([A-Z]\:)/)) {
-      this._path = this._path.slice(1);
-    }
-    this._path = decodeURIComponent(this._path);
     this.files = {};
     if (Imported.Quasi_ParamsPlus) {
       this.files["Parameters.json"] =
@@ -77,13 +74,15 @@ if (!Imported.Quasi_Input) {
         wrapper: "array",
         title: "Parameters",
         change: true,
+        folder: "data/",
         options:
         {
           level: 1,
+          wrapper: "object",
           title: "Parameter Settings",
           last: true,
-          wrapper: "object",
-          keys: ["abr", "name", "default"]
+          keys: ["abr", "name", "default"],
+          init: ["", "", 0]
         }
       };
     }
@@ -94,6 +93,7 @@ if (!Imported.Quasi_Input) {
         wrapper: "object",
         title: "Regions",
         change: true,
+        folder: QuasiMovement.jFolder,
         options:
         {
           level: 1,
@@ -106,17 +106,49 @@ if (!Imported.Quasi_Input) {
             title: "Box Settings",
             last: true,
             wrapper: "object",
-            keys: ["width", "height", "ox", "oy", "tag"]
+            keys: ["width", "height", "ox", "oy", "tag"],
+            init: [0, 0, 0, 0, ""]
           }
         }
       };
     }
+    if (Imported.Quasi_Depths) {
+      this.files["Depths.json"] =
+      {
+        level: 0,
+        wrapper: "object",
+        title: "Pixel Regions",
+        change: true,
+        folder: QuasiMovement.jFolder,
+        options:
+        {
+          level: 1,
+          wrapper: "object",
+          title: "Depths Setting",
+          keyname: "#HexColor",
+          last: true,
+          keys: ["depth", "zoom", "shiftY"],
+          init: [0, 1, 0]
+        }
+      };
+    }
+
+
   };
   QuasiJSON.setup();
+
+  QuasiJSON.setPath = function(folder) {
+    this._path = window.location.pathname.replace(/(\/www|)\/[^\/]*$/, "/" + folder);
+    if (this._path.match(/^\/([A-Z]\:)/)) {
+      this._path = this._path.slice(1);
+    }
+    this._path = decodeURIComponent(this._path);
+  };
 
   QuasiJSON.load = function(file) {
     this.file = file;
     this.format = this.files[file];
+    this.setPath(this.format.folder);
     this.level = 1;
     if (this.fs.existsSync(this._path + this.file)) {
       this.json = JSON.parse(this.fs.readFileSync(this._path + this.file, 'utf8'));
@@ -151,7 +183,6 @@ if (!Imported.Quasi_Input) {
       this.json = [];
     }
     this.addOptions(this.json, 1);
-    console.log(JSON.stringify(this.json, null, 2));
   };
 
   QuasiJSON.addOptions = function(json, level) {
@@ -160,10 +191,12 @@ if (!Imported.Quasi_Input) {
     }
     var options = this.findLevel(level);
     if (options.wrapper === "object") {
-      var id = json.length;
-      json[id] = {};
-      options.keys.forEach(function(key) {
-        json[id][key] = "";
+      var id = json.length || this.objectLength(json);
+      var keyname = options.keyname || "";
+      keyname = keyname + id;
+      json[keyname] = {};
+      options.keys.forEach(function(key, i) {
+        json[keyname][key] = typeof options.init[i] === 'undefied' ? "" : options.init[i];
       });
     } else if (options.wrapper === "array") {
       if (typeof json === "object") {
@@ -288,11 +321,12 @@ if (!Imported.Quasi_Input) {
   Scene_QuasiJSON.prototype.update = function() {
     Scene_Base.prototype.update.call(this);
     if (this._fileWindow.active) {
-      if (Input.isTriggered('backspace')) {
+      if (Input.isTriggered('#backspace')) {
         if (this._file[this._fileWindow.currentName()] && !this._final) {
           if (this._file.constructor === Array) {
             this._file.splice (this._fileWindow.currentName(), 1);
           } else {
+            console.log(this._fileWindow.currentName());
             delete this._file[this._fileWindow.currentName()];
           }
           QuasiJSON.save();
@@ -475,6 +509,7 @@ if (!Imported.Quasi_Input) {
     this.fileHeader.refresh();
     this.updatePlacement();
     this.activate();
+    this.select(0);
   };
 
   Window_QuasiFileList.prototype.reset = function() {
