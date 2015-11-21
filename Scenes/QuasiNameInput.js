@@ -4,7 +4,7 @@
 // Last Update: November 20, 2015
 //============================================================================
 // ** Terms of Use
-// This plugin is free to use for both free and commerical games!
+// This plugin is free to use for both free and commercial games!
 // Just write a special thanks to Quasi in the game please.
 //============================================================================
 // How to install:
