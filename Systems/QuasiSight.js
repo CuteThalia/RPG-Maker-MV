@@ -40,7 +40,7 @@ Imported.Quasi_Sight = 1.01;
  *   Giving Sight <Comment>
  *       <sight=shape, size, switch>
  *     Shape:  Can be; box, circle or poly
- *     Size:   The size of the view in pixels. For circles it's the diameter.
+ *     Size:   The size of the view in pixels. For circles it's the radius.
  *     Switch: The self switch it triggers, can be A, B, C or D
  *
  *   Don't change direction when changing Page <Note>
@@ -327,7 +327,7 @@ if (Imported.Quasi_Movement < 1.09) {
     if (shape === "circle") {
       this._sightSettings.collider = new QuasiMovement.Circle_Collider(this._sightSettings.length * 2, this._sightSettings.length * 2);
     } else if (shape === "box") {
-      this._sightSettings.collider = new QuasiMovement.Box_Collider(this._sightSettings.length * 2, this._sightSettings.length * 2);
+      this._sightSettings.collider = new QuasiMovement.Box_Collider(this._sightSettings.length, this._sightSettings.length);
     } else if (shape === "poly") {
       var w = this.collider().width;
       var h = this.collider().height;
