@@ -1,7 +1,7 @@
 //============================================================================
 // Quasi Sight
-// Version: 1.0
-// Last Update: November 16, 2015
+// Version: 1.01
+// Last Update: November 23, 2015
 //============================================================================
 // ** Terms of Use
 // http://quasixi.com/mv/
@@ -13,12 +13,12 @@
 //  - - Place somewhere below QuasiMovement
 //  - Configure as needed
 //  - Open the Help menu for setup guide or visit one of the following:
-//  - - http://quasixi.com/mv/
+//  - - http://quasixi.com/mv/movement/#sight
 //  - - http://forums.rpgmakerweb.com/index.php?/topic/48741-quasi-movement/
 //============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_Sight = 1.0;
+Imported.Quasi_Sight = 1.01;
 
 //=============================================================================
  /*:
@@ -99,7 +99,7 @@ Imported.Quasi_Sight = 1.0;
  * Got questions? Ask on my Quasi Movement thread at RPGMaker Web, link below.
  * =============================================================================
  * Links
- *  - http://quasixi.com/mv/
+ *  - http://quasixi.com/mv/movement/#sight
  *  - https://github.com/quasixi/RPG-Maker-MV
  *  - http://forums.rpgmakerweb.com/index.php?/topic/48741-quasi-movement/
  */
@@ -149,7 +149,8 @@ if (Imported.Quasi_Movement < 1.09) {
       this._sight.base.moveto(this.cx() - this._sight.base.width / 2, this.cy() - this._sight.base.height / 2);
     }
     if (Sight.show) {
-      SceneManager._scene.addTempCollider(this._sight.base, 600);
+      this._sight.base.color = 0xffffff;
+      SceneManager._scene.addTempCollider(this._sight.base, 120, true);
     }
     if (!this._sight.base.intersects(this._sightSettings.target.collider())) {
       $gameSelfSwitches.setValue(this._sightSettings.switch, false);
@@ -161,24 +162,27 @@ if (Imported.Quasi_Movement < 1.09) {
         return tile;
       }
     });
-    var i, j;
-    if (this._sight.tileShadows.length !== this._sight.tiles.length) {
-      this._sight.tileShadows = [];
-      for (i = 0, j = this._sight.tiles.length; i < j; i++) {
+    var i, j, insideAny;
+    for (i = 0, j = this._sight.tiles.length; i < j; i++) {
+      var id = this._sight.tiles[i].location;
+      if (!this._sight.tileShadows[id]) {
+        this._sight.tileShadows[id] = {};
         var shadowData = this.shadowCast(this._sight.tiles[i]);
         var shadow = new QuasiMovement.Polygon_Collider(shadowData[0]);
         shadow.moveto(shadowData[1], shadowData[2]);
-        this._sight.tileShadows.push(shadow);
+        this._sight.tileShadows[id].shadow = shadow;
       }
-    }
-    if (Sight.show) {
-      for (i = 0, j = this._sight.tileShadows.length; i < j; i++) {
-        SceneManager._scene.addTempCollider(this._sight.tileShadows[i], 120);
+      if (this._sight.tileShadows[id].reshape) {
+        SceneManager._scene.removeTempCollider(this._sight.tileShadows[id].shadow);
+        this._sight.tileShadows[id].reshape = false;
+        var shadowData = this.shadowCast(this._sight.tiles[i]);
+        this._sight.tileShadows[id].shadow.reshape(shadowData[0]);
+        this._sight.tileShadows[id].shadow.moveto(shadowData[1], shadowData[2]);
       }
-    }
-    var insideAny;
-    for (i = 0, j = this._sight.tileShadows.length; i < j; i++) {
-      if (this._sight.tileShadows[i].halfInside(this._sightSettings.target.collider())) {
+      if (this._sight.tileShadows[id].shadow.halfInside(this._sightSettings.target.collider())) {
+        if (Sight.show) {
+          SceneManager._scene.addTempCollider(this._sight.tileShadows[id].shadow, 120, true);
+        }
         insideAny = true;
       }
     }
@@ -206,6 +210,7 @@ if (Imported.Quasi_Movement < 1.09) {
         this._sight.objs[events[i]._eventId].shadow.moveto(shadowData[1], shadowData[2]);
       }
       if (this._sight.objs[events[i]._eventId].reshape) {
+        SceneManager._scene.removeTempCollider(this._sight.objs[events[i]._eventId].shadow);
         this._sight.objs[events[i]._eventId].reshape = false;
         var shadowData = this.shadowCast(events[i].collider());
         this._sight.objs[events[i]._eventId].shadow.reshape(shadowData[0]);
@@ -213,7 +218,7 @@ if (Imported.Quasi_Movement < 1.09) {
       }
       if (this._sight.objs[events[i]._eventId].shadow.halfInside(this._sightSettings.target.collider())) {
         if (Sight.show) {
-          SceneManager._scene.addTempCollider(this._sight.objs[events[i]._eventId].shadow, 60, true);
+          SceneManager._scene.addTempCollider(this._sight.objs[events[i]._eventId].shadow, 300, true);
         }
         insideAny = true;
       }
@@ -282,13 +287,18 @@ if (Imported.Quasi_Movement < 1.09) {
     }
     if (!this._sight) {
       this._sight = {};
-      this._sight.tileShadows = [];
+      this._sight.tileShadows = {};
       this._sight.objs = {};
       return true;
     }
     if (this._sight.origin.x !== this._px || this._sight.origin.y !== this._py ||
         this._sight.origin.dir !== this._direction) {
-      this._sight.tileShadows = [];
+      SceneManager._scene.removeTempCollider(this._sight.base);
+      for (var obj in this._sight.tileShadows) {
+        if (this._sight.tileShadows.hasOwnProperty(obj)) {
+          this._sight.tileShadows[obj].reshape = true;
+        }
+      }
       for (var obj in this._sight.objs) {
         if (this._sight.objs.hasOwnProperty(obj)) {
           this._sight.objs[obj].reshape = true;
@@ -359,6 +369,18 @@ if (Imported.Quasi_Movement < 1.09) {
   Game_CharacterBase.prototype.castShadow = function() {
     return false;
   };
+
+  var Alias_Game_CharacterBase_reloadBoxes = Game_CharacterBase.prototype.reloadBoxes;
+  Game_CharacterBase.prototype.reloadBoxes = function() {
+    Alias_Game_CharacterBase_reloadBoxes.call(this);
+    if (this._sight) {
+      var hadSight = true;
+    }
+    this._sight = null;
+    if (hadSight) {
+      this.setupSight();
+    }
+  }
 
   //-----------------------------------------------------------------------------
   // Game_Event
