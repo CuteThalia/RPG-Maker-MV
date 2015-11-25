@@ -1,7 +1,7 @@
 //============================================================================
 // Quasi Movement Plus
-// Version: 1.0
-// Last Update: Novemeber 23, 2015
+// Version: 1.01
+// Last Update: Novemeber 24, 2015
 //============================================================================
 // ** Terms of Use
 // http://quasixi.com/mv/
@@ -18,7 +18,7 @@
 //============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_MovementPlus = 1.0;
+Imported.Quasi_MovementPlus = 1.01;
 
 //=============================================================================
  /*:
@@ -94,7 +94,7 @@ if (!Imported.Quasi_Movement) {
 
   var Alias_Game_Player_update = Game_Player.prototype.update;
   Game_Player.prototype.update = function(sceneActive) {
-    if (!this.isMoving() && this.canMove()) {
+    if (MovementPlus.faceMouse && !this.isMoving() && this.canMove()) {
       this.updateDirection();
     }
     Alias_Game_Player_update.call(this, sceneActive);
