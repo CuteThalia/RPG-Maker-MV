@@ -1,7 +1,7 @@
 //============================================================================
 // Quasi Movement
-// Version: 1.105
-// Last Update: November 25, 2015
+// Version: 1.106
+// Last Update: November 26, 2015
 //============================================================================
 // ** Terms of Use
 // http://quasixi.com/mv/
@@ -22,7 +22,7 @@
 //============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_Movement = 1.105;
+Imported.Quasi_Movement = 1.106;
 
 //=============================================================================
  /*:
@@ -1747,6 +1747,14 @@ var QuasiMovement = (function() {
       this._animationCount += 1.5;
     } else if (this.hasStepAnime() || !this.isOriginalPattern()) {
       this._animationCount++;
+    }
+  };
+
+  Game_CharacterBase.prototype.updatePattern = function() {
+    if (!this.hasStepAnime() && this.isStopping()) {
+      this.resetPattern();
+    } else {
+      this._pattern = (this._pattern + 1) % this.maxPattern();
     }
   };
 
