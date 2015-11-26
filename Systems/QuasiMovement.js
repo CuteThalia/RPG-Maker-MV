@@ -1,7 +1,7 @@
 //============================================================================
 // Quasi Movement
-// Version: 1.10
-// Last Update: November 23, 2015
+// Version: 1.105
+// Last Update: November 25, 2015
 //============================================================================
 // ** Terms of Use
 // http://quasixi.com/mv/
@@ -22,7 +22,7 @@
 //============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_Movement = 1.10;
+Imported.Quasi_Movement = 1.105;
 
 //=============================================================================
  /*:
@@ -138,11 +138,6 @@ Imported.Quasi_Movement = 1.10;
  * @param Use Regions Boxes
  * @desc Set to true if you want to put Box Colliders on regions.
  * default: false
- * @default false
- *
- * @param Convert Collision Map
- * @desc Converts the collision map into Box Colliders.
- * Set to true or false  (Not fully supported yet, should leave false)
  * @default false
  *
  * @param Show Boxes
@@ -364,7 +359,6 @@ var QuasiMovement = (function() {
     this.rmFolder    = parameters['Region Map folder'];
     this.cmFolder    = parameters['Collision Map folder'];
     this.useRegions  = (parameters['Use Regions Boxes'].toLowerCase() === 'true');
-    this.convert     = (parameters['Convert Collision Map'].toLowerCase() === 'true');
     this.showBoxes   = (parameters['Show Boxes'].toLowerCase() === 'true');
     this.tileBoxes   = {
       1537: [48, 6, 0, 42],
@@ -546,8 +540,12 @@ var QuasiMovement = (function() {
       this.edges.right  = [topRight, bottomRight];
       this.edges.top    = [topLeft, topRight];
       this.edges.bottom = [bottomLeft, bottomRight];
-      this._vertices = [topLeft, topRight, bottomLeft, bottomRight];
+      this._vertices = [topLeft, topRight, bottomRight, bottomLeft];
     }
+    return this._vertices;
+  };
+
+  Box_Collider.prototype.shapeVertices = function() {
     return this._vertices;
   };
 
@@ -578,11 +576,11 @@ var QuasiMovement = (function() {
     var x1min = this._vertices[0].x;
     var x1max = this._vertices[1].x;
     var y1min = this._vertices[0].y;
-    var y1max = this._vertices[2].y;
+    var y1max = this._vertices[3].y;
     var x2min = otherVertices[0].x;
     var x2max = otherVertices[1].x;
     var y2min = otherVertices[0].y;
-    var y2max = otherVertices[2].y;
+    var y2max = otherVertices[3].y;
     var insideX = (x1min <= x2max) && (x1max >= x2min);
     var insideY = (y1min <= y2max) && (y1max >= y2min);
     return insideX && insideY;
@@ -614,8 +612,8 @@ var QuasiMovement = (function() {
         return true;
       }
     }
-    for (i = 0, j = circle._circleVertices.length; i < j; i++) {
-      if (this.containsPoint(circle._circleVertices[i].x , circle._circleVertices[i].y)) {
+    for (i = 0, j = circle.shapeVertices().length; i < j; i++) {
+      if (this.containsPoint(circle.shapeVertices()[i].x , circle.shapeVertices()[i].y)) {
         return true;
       }
     }
@@ -626,11 +624,7 @@ var QuasiMovement = (function() {
     if (this.height === 0 || this.width === 0) {
       return false;
     }
-    if (other.isCircle()) {
-      var vertices = other._circleVertices;
-    } else {
-      var vertices = other._vertices;
-    }
+    var vertices = other.shapeVertices();
     var i, j;
     for (i = 0, j = vertices.length; i < j; i++) {
       if (!this.containsPoint(vertices[i].x, vertices[i].y)) {
@@ -644,11 +638,7 @@ var QuasiMovement = (function() {
     if (this.height === 0 || this.width === 0) {
       return false;
     }
-    if (other.isCircle()) {
-      var vertices = other._circleVertices;
-    } else {
-      var vertices = other._vertices;
-    }
+    var vertices = other.shapeVertices();
     var pass = 0;
     var i, j;
     for (i = 0, j = vertices.length; i < j; i++) {
@@ -669,7 +659,7 @@ var QuasiMovement = (function() {
     var x1min = this._vertices[0].x;
     var x1max = this._vertices[1].x;
     var y1min = this._vertices[0].y;
-    var y1max = this._vertices[2].y;
+    var y1max = this._vertices[3].y;
     var insideX = (x1min <= x) && (x1max >= x);
     var insideY = (y1min <= y) && (y1max >= y);
     return insideX && insideY;
@@ -705,11 +695,15 @@ var QuasiMovement = (function() {
       var bottom = new Point(this._vertices[0].x + rx, this._vertices[0].y + 2 * ry);
       var topLeft     = new Point(this._vertices[0].x + rx / 2, this._vertices[0].y + ry / 2);
       var topRight    = new Point(this._vertices[1].x - rx / 2, this._vertices[1].y + ry / 2);
-      var bottomLeft  = new Point(this._vertices[2].x + rx / 2, this._vertices[3].y - ry / 2);
-      var bottomRight = new Point(this._vertices[3].x - rx / 2, this._vertices[3].y - ry / 2);
-      this._circleVertices = [top, left, right, bottom, topLeft, topRight, bottomLeft, bottomRight];
+      var bottomRight = new Point(this._vertices[2].x - rx / 2, this._vertices[2].y - ry / 2);
+      var bottomLeft  = new Point(this._vertices[3].x + rx / 2, this._vertices[3].y - ry / 2);
+      this._circleVertices = [topLeft, top, topRight, right, bottomRight, bottom, bottomLeft, left];
     }
     return this._vertices;
+  };
+
+  Circle_Collider.prototype.shapeVertices = function() {
+    return this._circleVertices;
   };
 
   Circle_Collider.prototype.isCircle = function() {
@@ -761,23 +755,33 @@ var QuasiMovement = (function() {
   Polygon_Collider.prototype = Object.create(Box_Collider.prototype);
   Polygon_Collider.prototype.constructor = Polygon_Collider;
 
-  Polygon_Collider.prototype.initialize = function(vertices) {
+  Polygon_Collider.prototype.initialize = function(points) {
     this.polyVertices = [];
     this.baseVertices = [];
-    for (var i = 0; i < vertices.length; i++) {
-      this.polyVertices.push(new Point(vertices[i].x, vertices[i].y));
-      this.baseVertices.push(new Point(vertices[i].x, vertices[i].y));
+    points = points.map(function(point) {
+      if (point.constructor === Array) {
+        var x = Number(point[0]);
+        var y = Number(point[1]);
+        return new Point(x, y);
+      }
+      return point;
+    });
+    for (var i = 0; i < points.length; i++) {
+      var x = points[i].x;
+      var y = points[i].y;
+      this.polyVertices.push(new Point(x, y));
+      this.baseVertices.push(new Point(x, y));
     }
-    vertices.sort(function(a, b) {
+    points.sort(function(a, b) {
       return a.x - b.x;
     });
-    var xMin = vertices[0].x;
-    var xMax = vertices[vertices.length - 1].x;
-    vertices.sort(function(a, b) {
+    var xMin = points[0].x;
+    var xMax = points[points.length - 1].x;
+    points.sort(function(a, b) {
       return a.y- b.y;
     });
-    var yMin = vertices[0].y;
-    var yMax = vertices[vertices.length - 1].y;
+    var yMin = points[0].y;
+    var yMax = points[points.length - 1].y;
     var w = Math.abs(xMax - xMin);
     var h = Math.abs(yMax - yMin);
     var ox = Math.min(xMin, 0, xMax);
@@ -812,44 +816,25 @@ var QuasiMovement = (function() {
     return Box_Collider.prototype.vertices.call(this, reset);
   };
 
+  Polygon_Collider.prototype.shapeVertices = function() {
+    return this.polyVertices;
+  };
+
   Polygon_Collider.prototype.intersects = function(other) {
-    if (other.isCircle()) {
-      return this.intersectsWithCircle(other);
-    }
-    if (other.isBox()) {
-      return this.intersectsWithBox(other);
-    }
-    // Not a real polygon intersection check!
-    // There should not be any polygon - polygon intersections anyways
     var i, j;
-    for (i = 0, j = other.polyVertices.length; i < j; i++) {
-      if (this.containsPoint(other.polyVertices[i].x, other.polyVertices[i].y)) {
+    for (i = 0, j = other.shapeVertices().length; i < j; i++) {
+      if (this.containsPoint(other.shapeVertices()[i].x, other.shapeVertices()[i].y)) {
         return true;
       }
     }
-    return false;
-  };
-
-  Polygon_Collider.prototype.intersectsWithCircle = function(other) {
-    // Not accurate but good enough for what I use it for
-    var i, j;
-    for (i = 0, j = other._circleVertices.length; i < j; i++) {
-      if (this.containsPoint(other._circleVertices[i].x, other._circleVertices[i].y)) {
+    for (i = 0, j = this.shapeVertices().length; i < j; i++) {
+      if (other.containsPoint(this.shapeVertices()[i].x, this.shapeVertices()[i].y)) {
         return true;
       }
     }
     return false
   };
 
-  Polygon_Collider.prototype.intersectsWithBox = function(other) {
-    var i, j;
-    for (i = 0, j = other._vertices.length; i < j; i++) {
-      if (this.containsPoint(other._vertices[i].x, other._vertices[i].y)) {
-        return true;
-      }
-    }
-    return false
-  };
 
   Polygon_Collider.prototype.containsPoint = function(x, y) {
     var i;
@@ -1079,15 +1064,11 @@ var QuasiMovement = (function() {
   Game_Map.prototype.setupCollisionmap = function() {
     var cm = /<cm=(.*)>/i.exec($dataMap.note);
     if (cm) {
-      if (Movement.convert) {
-        this.convertCollisionmap(cm);
-      } else {
-        this._collisionmap = ImageManager.loadBitmap(Movement.cmFolder, cm[1]);
-        if (Movement.showBoxes && $gameTemp.isPlaytest()) {} {
-          this._collisionmap.addLoadListener(function() {
-            $gameMap.drawTileBoxes();
-          });
-        }
+      this._collisionmap = ImageManager.loadBitmap(Movement.cmFolder, cm[1]);
+      if (Movement.showBoxes && $gameTemp.isPlaytest()) {} {
+        this._collisionmap.addLoadListener(function() {
+          $gameMap.drawTileBoxes();
+        });
       }
     } else {
       this._collisionmap = new Bitmap(this.width() * Movement.tileSize, this.height() * Movement.tileSize);
@@ -1104,105 +1085,6 @@ var QuasiMovement = (function() {
     if (this._regionmap) {
       delete this._regionmap;
     }
-  };
-
-  Game_Map.prototype.convertCollisionmap = function(cm) {
-    var img = ImageManager.loadBitmap(Movement.cmFolder, cm[1]);
-    var collisionBoxes = img.addLoadListener(function() {
-      var boxes = [];
-      var nodes = new Array(img.height);
-      for (var x = 0; x < nodes.length; x++) {
-        nodes[x] = [];
-      }
-      var collisions = [];
-      collisions.push(Movement.collision);
-      collisions.push(Movement.water1);
-      collisions.push(Movement.water2);
-      var y = img.height;
-      var x = 0;
-      while (y > 0){
-        y--;
-        x = img.width;
-        while (x > 0){
-          x--;
-          while (!collisions.contains(img.getColor(x, y))) {
-            x--;
-            if (x === 0) {
-              break;
-            }
-          }
-          if (x === 0) {
-            break;
-          }
-          var color = img.getColor(x, y);
-          if (!collisions.contains(color)) {
-            break;
-          }
-          while (nodes[y].contains(x)) {
-            x--;
-          }
-          if (img.getColor(x, y) !== color) {
-            continue;
-          } else if (x < 0) {
-            break;
-          }
-          var starting_x = x;
-
-          while (img.getColor(x, y) === color) {
-            x--;
-            if (nodes[y].contains(x)) {
-              break;
-            }
-            if (x === 0) {
-              break;
-            }
-          }
-          var ending_x = x;
-          var temp_x;
-          var temp_y = y;
-
-          while (true) {
-            temp_x = starting_x;
-            temp_y--;
-            while (img.getColor(temp_x, temp_y) === color) {
-              temp_x--;
-              if (temp_x === ending_x) {
-                break;
-              }
-            }
-            if (temp_x === ending_x) {
-              for (var scanned_x = starting_x; scanned_x !== ending_x; scanned_x--) {
-                nodes[temp_y].push(scanned_x);
-              }
-            } else {
-              break;
-            }
-            if (temp_y === 0) {
-              break;
-            }
-          }
-          var w = starting_x - ending_x + 1;
-          var h = y - temp_y + 1;
-          var newBox = new Box_Collider(w, h);
-          newBox.moveto(ending_x, temp_y);
-          newBox.color = color;
-          boxes.push(newBox);
-        }
-      }
-      $gameMap._collisionmap = new Bitmap($gameMap.width() * Movement.tileSize, $gameMap.height() * Movement.tileSize);
-      if (Movement.showBoxes && $gameTemp.isPlaytest()) {
-        for (var i = 0; i < boxes.length; i++) {
-          var x = boxes[i].x;
-          var y = boxes[i].y;
-          var w = boxes[i].width;
-          var h = boxes[i].height;
-          var color = boxes[i].color || Movement.collision;
-          $gameMap._collisionmap.fillRect(x, y, w, h, color);
-        }
-        $gameMap.drawTileBoxes();
-      }
-      $gameMap.createCollisionGrid(boxes);
-    });
   };
 
   Game_Map.prototype.setupRegionmap = function() {
@@ -1232,26 +1114,6 @@ var QuasiMovement = (function() {
     }
   };
 
-  Game_Map.prototype.createCollisionGrid = function(boxes) {
-    for (var i = 0; i < boxes.length; i++) {
-      var box  = boxes[i];
-      var edge = box.gridEdge();
-      var x1   = edge[0];
-      var x2   = edge[1];
-      var y1   = edge[2];
-      var y2   = edge[3];
-      var vx = x1 * this.height() * this.width();
-      var vy = y1 * this.height();
-      var vz = this._tileBoxes[x1][y1] ? this._tileBoxes[x1][y1].length : 0;
-      box.location  = vx + vy + vz;
-      for (var x = x1; x <= x2; x++) {
-        for (var y = y1; y <= y2; y++) {
-          this._tileBoxes[x][y].push(box);
-        }
-      }
-    }
-  };
-
   Game_Map.prototype.collisionMapPass = function(collider, dir, passableColors) {
     if (!this._collisionmap.isReady()) {
       return false;
@@ -1265,12 +1127,9 @@ var QuasiMovement = (function() {
   };
 
   Game_Map.prototype.insidePassableOnly = function(collider, passableColors) {
-    if (!Movement.convert) {
-      passableColors.splice(passableColors.indexOf("#000000"), 1);
-      return this.collisionMapBoxPass(collider, "top", passableColors) &&
-             this.collisionMapBoxPass(collider, "bottom", passableColors);
-    }
-    return true;
+    passableColors.splice(passableColors.indexOf("#000000"), 1);
+    return this.collisionMapBoxPass(collider, "top", passableColors) &&
+           this.collisionMapBoxPass(collider, "bottom", passableColors);
   };
 
   Game_Map.prototype.collisionMapBoxPass = function(collider, dir, passableColors) {
@@ -1655,17 +1514,15 @@ var QuasiMovement = (function() {
     if (this.collideWithTileBox(dir)) {
       return false;
     }
-    if (!Movement.convert) {
-      var edge = {2: "bottom", 4: "left", 6: "right", 8: "top"};
-      if (dir === 5) {
-        if (!$gameMap.collisionMapPass(this.collider(dir), "top", this.passableColors()) &&
-            !$gameMap.collisionMapPass(this.collider(dir), "top", this.passableColors())) {
-          return false;
-        }
-      } else {
-        if (!$gameMap.collisionMapPass(this.collider(dir), edge[dir], this.passableColors())) {
-          return false;
-        }
+    var edge = {2: "bottom", 4: "left", 6: "right", 8: "top"};
+    if (dir === 5) {
+      if (!$gameMap.collisionMapPass(this.collider(dir), "top", this.passableColors()) &&
+          !$gameMap.collisionMapPass(this.collider(dir), "bottom", this.passableColors())) {
+        return false;
+      }
+    } else {
+      if (!$gameMap.collisionMapPass(this.collider(dir), edge[dir], this.passableColors())) {
+        return false;
       }
     }
     if (this.collideWithCharacter(dir)) {
@@ -1691,17 +1548,15 @@ var QuasiMovement = (function() {
     if (this.collideWithTileBox(dir)) {
       return false;
     }
-    if (!Movement.convert) {
-      var edge = {2: "bottom", 4: "left", 6: "right", 8: "top"};
-      if (dir === 5) {
-        if (!$gameMap.collisionMapPass(this.collider(dir), "top", this.passableColors()) &&
-            !$gameMap.collisionMapPass(this.collider(dir), "top", this.passableColors())) {
-          return false;
-        }
-      } else {
-        if (!$gameMap.collisionMapPass(this.collider(dir), edge[dir], this.passableColors())) {
-          return false;
-        }
+    var edge = {2: "bottom", 4: "left", 6: "right", 8: "top"};
+    if (dir === 5) {
+      if (!$gameMap.collisionMapPass(this.collider(dir), "top", this.passableColors()) &&
+          !$gameMap.collisionMapPass(this.collider(dir), "bottom", this.passableColors())) {
+        return false;
+      }
+    } else {
+      if (!$gameMap.collisionMapPass(this.collider(dir), edge[dir], this.passableColors())) {
+        return false;
       }
     }
     if (this._passabilityLevel === 1 || this._passabilityLevel === 2) {
@@ -3315,6 +3170,9 @@ var QuasiMovement = (function() {
   };
 
   Spriteset_Map.prototype.addTempCollider = function(collider, duration, clearable) {
+    if (!this._tempColliders) {
+      return;
+    }
     var i, j;
     for (i = 0, j = this._tempColliders.length; i < j; i++) {
       if (this._tempColliders[i].sprite.collider === collider) {
@@ -3337,7 +3195,7 @@ var QuasiMovement = (function() {
   };
 
   Spriteset_Map.prototype.removeTempCollider = function(collider) {
-    if (this._tempColliders.length === 0) {
+    if (!this._tempColliders || this._tempColliders.length === 0) {
       return;
     }
     for (var i = 0, j = this._tempColliders.length - 1; i >= 0; i--) {
@@ -3349,7 +3207,7 @@ var QuasiMovement = (function() {
   };
 
   Spriteset_Map.prototype.removeAllTempColliders = function() {
-    if (this._tempColliders.length === 0) {
+    if (!this._tempColliders || this._tempColliders.length === 0) {
       return;
     }
     for (var i = this._tempColliders.length - 1; i >= 0; i--) {
