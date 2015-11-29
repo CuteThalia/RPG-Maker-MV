@@ -1,7 +1,7 @@
 //============================================================================
 // Quasi Movement
-// Version: 1.106
-// Last Update: November 26, 2015
+// Version: 1.11
+// Last Update: November 28, 2015
 //============================================================================
 // ** Terms of Use
 // http://quasixi.com/mv/
@@ -22,7 +22,7 @@
 //============================================================================
 
 var Imported = Imported || {};
-Imported.Quasi_Movement = 1.106;
+Imported.Quasi_Movement = 1.11;
 
 //=============================================================================
  /*:
@@ -296,6 +296,13 @@ Imported.Quasi_Movement = 1.106;
  *     Jumps 1 tile size forward
  *     Direction defaults to the characters direction so it can be left out.
  *
+ *   Change Collision Map / Region Map
+ *       $gameMap.loadCollisionmap(file)
+ *         or
+ *       $gameMap.loadRegionmap(file)
+ *     File: Set to the new collison / region map you want to load.
+ *     * Will replace current one.
+ *
  *   Create a collider
  *       var myBoxCollider = new QuasiMovement.Box_Collider(w, h, ox, oy, shiftY);
  *         or
@@ -417,10 +424,12 @@ var QuasiMovement = (function() {
     xhr.send();
   };
 
-  Movement.stringToAry = function(string) {
+  Movement.stringToAry = function(string, removeWhiteSpace) {
     var ary = string.split(',');
     ary = ary.map(function(s) {
-      s = s.replace(/\s+/g, '');
+      if (!removeWhiteSpace) {
+        s = s.replace(/\s+/g, '');
+      }
       if (/^-?[0-9]+$/.test(s)) {
         return Number(s || 0);
       }
@@ -440,7 +449,15 @@ var QuasiMovement = (function() {
     ary.forEach(function(e, i, a) {
       var s = /^(.*):(.*)/.exec(e);
       if (s) {
-        obj[s[1]] = thisobj.stringToAry(s[2]);
+        var key = newKey = s[1];
+        if (obj.hasOwnProperty(key)) {
+          var i = 1;
+          while (obj.hasOwnProperty(newKey)) {
+            newKey = key + String(i);
+            i++;
+          }
+        }
+        obj[newKey] = thisobj.stringToAry(s[2]);
       }
     });
     return obj;
@@ -464,7 +481,7 @@ var QuasiMovement = (function() {
   Scene_Map.prototype.onMapLoaded = function() {
     Alias_Scene_Map_onMapLoaded.call(this);
     $gameMap.reloadAllBoxes();
-  }
+  };
 
   //-----------------------------------------------------------------------------
   // Box_Collider
@@ -904,7 +921,7 @@ var QuasiMovement = (function() {
   Game_Map.prototype.reloadAllBoxes = function() {
     delete this._tileBoxes;
     delete this._characterGrid;
-    this.reloadTileBoxes();
+    this.reloadTileMap();
     var i, j;
     for (i = 0, j = this.events().length; i < j; i++) {
       this.events()[i].reloadBoxes();
@@ -918,7 +935,7 @@ var QuasiMovement = (function() {
     });
   };
 
-  Game_Map.prototype.reloadTileBoxes = function() {
+  Game_Map.prototype.reloadTileMap = function() {
     this._tileBoxes = new Array(this.width());
     for (var x = 0; x < this._tileBoxes.length; x++) {
       this._tileBoxes[x] = [];
@@ -933,9 +950,11 @@ var QuasiMovement = (function() {
         this._characterGrid[x].push([]);
       }
     }
+    var cm = /<cm=(.*)>/i.exec($dataMap.note);
+    var rm = /<rm=(.*)>/i.exec($dataMap.note);
     this.setupTileBoxes();
-    this.setupCollisionmap();
-    this.setupRegionmap();
+    this.loadCollisionmap(cm ? cm[1] : null);
+    this.loadRegionmap(rm ? rm[1] : null);
   };
 
   Game_Map.prototype.flagAt = function(x, y) {
@@ -1061,10 +1080,9 @@ var QuasiMovement = (function() {
     return newBox;
   };
 
-  Game_Map.prototype.setupCollisionmap = function() {
-    var cm = /<cm=(.*)>/i.exec($dataMap.note);
+  Game_Map.prototype.loadCollisionmap = function(cm) {
     if (cm) {
-      this._collisionmap = ImageManager.loadBitmap(Movement.cmFolder, cm[1]);
+      this._collisionmap = ImageManager.loadBitmap(Movement.cmFolder, cm);
       if (Movement.showBoxes && $gameTemp.isPlaytest()) {} {
         this._collisionmap.addLoadListener(function() {
           $gameMap.drawTileBoxes();
@@ -1087,12 +1105,11 @@ var QuasiMovement = (function() {
     }
   };
 
-  Game_Map.prototype.setupRegionmap = function() {
-    var rm = /<rm=(.*)>/i.exec($dataMap.note);
+  Game_Map.prototype.loadRegionmap = function(rm) {
     if (rm) {
-      this._regionmap = ImageManager.loadBitmap(Movement.rmFolder, rm[1]);
+      this._regionmap = ImageManager.loadBitmap(Movement.rmFolder, rm);
     } else {
-      this._regionmap = null;
+      this._regionmap = new Bitmap(this.width() * Movement.tileSize, this.height() * Movement.tileSize);
     }
   };
 
@@ -1402,16 +1419,16 @@ var QuasiMovement = (function() {
     }
   };
 
-  Game_CharacterBase.prototype.stillMoving = function() {
+  Game_CharacterBase.prototype.isMoving = function() {
     return this._moveCount > 0;
   };
 
-  Game_CharacterBase.prototype.isMoving = function() {
+  Game_CharacterBase.prototype.startMoving = function() {
     return this._realPX !== this._px || this._realPY !== this._py;
   };
 
   Game_CharacterBase.prototype.isStopping = function() {
-    return !this.stillMoving() && !this.isJumping();
+    return !this.isMoving() && !this.isJumping();
   };
 
   Game_CharacterBase.prototype.gridChanged = function() {
@@ -1688,7 +1705,7 @@ var QuasiMovement = (function() {
     }
     if (this.isJumping()) {
       this.updateJump();
-    } else if (this.isMoving()) {
+    } else if (this.startMoving()) {
       this.updateMove();
     }
     this.updateAnimation();
@@ -1729,7 +1746,7 @@ var QuasiMovement = (function() {
       this._freqCount += this.moveTiles();
     }
 
-    if (!this.isMoving()) {
+    if (!this.startMoving()) {
       this.refreshBushDepth();
     }
   };
@@ -1743,7 +1760,7 @@ var QuasiMovement = (function() {
   };
 
   Game_CharacterBase.prototype.updateAnimationCount = function() {
-    if (this.stillMoving() && this.hasWalkAnime()) {
+    if (this.isMoving() && this.hasWalkAnime()) {
       this._animationCount += 1.5;
     } else if (this.hasStepAnime() || !this.isOriginalPattern()) {
       this._animationCount++;
@@ -1774,7 +1791,7 @@ var QuasiMovement = (function() {
   Game_CharacterBase.prototype.refreshBushDepth = function() {
     if (this.isNormalPriority() && !this.isObjectCharacter() &&
         this.isOnBush() && !this.isJumping()) {
-      if (!this.isMoving()) {
+      if (!this.startMoving()) {
         this._bushDepth = 12;
       }
     } else {
@@ -2306,7 +2323,7 @@ var QuasiMovement = (function() {
     if (!Movement.diagonal){
       Alias_Game_Player_moveByInput.call(this);
     } else {
-      if (!this.isMoving() && this.canMove()) {
+      if (!this.startMoving() && this.canMove()) {
         var direction = Input.dir8;
         if (direction > 0) {
           $gameTemp.clearDestination();
@@ -2334,14 +2351,14 @@ var QuasiMovement = (function() {
     this.updateDashing();
     if (sceneActive) {
       this.moveByInput();
-      if (!this.isMoving() && this.canMove()) {
+      if (!this.startMoving() && this.canMove()) {
         this.updatePathFind();
       }
     }
     Game_Character.prototype.update.call(this);
     this.updateScroll(lastScrolledX, lastScrolledY);
     this.updateVehicle();
-    if (!this.isMoving()) {
+    if (!this.startMoving()) {
       this.updateNonmoving(this._wasMoving);
     }
     this._followers.update();
@@ -2710,7 +2727,7 @@ var QuasiMovement = (function() {
   };
 
   Game_Follower.prototype.updateMoveList = function(preceding, gathering) {
-    if (this._moveList.length === 0 || this.isMoving()) {
+    if (this._moveList.length === 0 || this.startMoving()) {
       return;
     }
     var move = this._moveList.shift();
@@ -3059,7 +3076,6 @@ var QuasiMovement = (function() {
 
   Sprite_Collider.prototype.update = function() {
     Sprite.prototype.update.call(this);
-    this._count++;
     if (this._colliderSprite.visible) {
       this.checkChanges();
     }
@@ -3088,6 +3104,8 @@ var QuasiMovement = (function() {
       }
     }
   };
+
+  Movement.Sprite_Collider = Sprite_Collider;
 
   //-----------------------------------------------------------------------------
   // Sprite_Destination
@@ -3137,7 +3155,6 @@ var QuasiMovement = (function() {
     this._colliderData = this._character.collider();
     if (!this._colliderSprite) {
       this._colliderSprite = new Sprite_Collider(this._colliderData, true);
-      this._colliderSprite.setupCollider(this._colliderData);
       this._colliderSprite.x = -this.x + this._colliderData.vertices()[0].x;
       this._colliderSprite.x -= $gameMap.displayX() * Movement.tileSize;
       this._colliderSprite.y = -this.y + this._colliderData.vertices()[0].y;
@@ -3257,7 +3274,6 @@ var QuasiMovement = (function() {
   Spriteset_Map.prototype.updateTempColliders = function() {
     if (this._tempColliders.length > 0) {
       for (var i = this._tempColliders.length - 1; i >= 0; i--) {
-        this._tempColliders[i].sprite.update();
         this._tempColliders[i].sprite._colliderSprite.visible = Movement.showBoxes;
         if (!this._tempColliders[i].sprite.isPlaying()) {
           this.removeChild(this._tempColliders[i].sprite);
@@ -3303,34 +3319,6 @@ var QuasiMovement = (function() {
       result += this._pixelData[i + c].toString(16).padZero(2);
     }
     return result;
-  };
-
-  Bitmap.prototype.drawEllipse = function(x, y, radiusX, radiusY, color) {
-    var context = this._context;
-    context.save();
-    context.fillStyle = color;
-    context.beginPath();
-    context.scale(radiusX, radiusY);
-    context.arc(1, 1, 1, 0, Math.PI * 2, false);
-    context.translate(x, y);
-    context.fill();
-    context.restore();
-    this._setDirty();
-  };
-
-  Bitmap.prototype.drawPolygon = function(points, shiftX, shiftY, color) {
-    var context = this._context;
-    context.save();
-    context.fillStyle = color;
-    context.moveTo(points[0].x + shiftX, points[0].y + shiftY);
-    var i, j;
-    for (i = 0, j = points.length; i < j; i++) {
-      context.lineTo(points[i].x + shiftX, points[i].y + shiftY);
-    }
-    context.closePath();
-    context.fill();
-    context.restore();
-    this._setDirty();
   };
 
   return Movement;
